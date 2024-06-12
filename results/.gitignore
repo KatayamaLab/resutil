@@ -1,0 +1,9 @@
+# このファイルがあることで、resultsディレクトリがgitの管理対象外になる
+
+*
+!.gitignore
+# Resutil result dir
+# Automatically added by resutil
+# Files here are not managed by git
+*
+!.gitignore
