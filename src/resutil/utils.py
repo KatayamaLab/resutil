@@ -18,7 +18,7 @@ def to_base26(n):
 
 
 def parse_result_dirs(text: str):
-    pattern = r"[a-zA-Z]{5}_\d{8}T\d{6}_[^/\s\\]*"
+    pattern = r"[a-zA-Z]{6}_\d{8}T\d{6}_[^/\s\\]*"
     matches = re.findall(pattern, text)
     return matches
 
