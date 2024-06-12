@@ -6,12 +6,15 @@
 #   features: []
 #   all-features: false
 #   with-sources: false
+#   generate-hashes: false
 
 -e file:.
 attrs==23.2.0
     # via boxsdk
 boxsdk==3.9.2
     # via resutil
+cachetools==5.3.3
+    # via google-auth
 certifi==2024.6.2
     # via requests
 cffi==1.16.0
@@ -26,6 +29,24 @@ gitdb==4.0.11
     # via gitpython
 gitpython==3.1.43
     # via resutil
+google-api-core==2.19.0
+    # via google-cloud-core
+    # via google-cloud-storage
+google-auth==2.30.0
+    # via google-api-core
+    # via google-cloud-core
+    # via google-cloud-storage
+google-cloud-core==2.4.1
+    # via google-cloud-storage
+google-cloud-storage==2.17.0
+    # via resutil
+google-crc32c==1.5.0
+    # via google-cloud-storage
+    # via google-resumable-media
+google-resumable-media==2.7.1
+    # via google-cloud-storage
+googleapis-common-protos==1.63.1
+    # via google-api-core
 idna==3.7
     # via requests
 iniconfig==2.0.0
@@ -38,6 +59,17 @@ packaging==24.0
     # via pytest
 pluggy==1.5.0
     # via pytest
+proto-plus==1.23.0
+    # via google-api-core
+protobuf==4.25.3
+    # via google-api-core
+    # via googleapis-common-protos
+    # via proto-plus
+pyasn1==0.6.0
+    # via pyasn1-modules
+    # via rsa
+pyasn1-modules==0.4.0
+    # via google-auth
 pycparser==2.22
     # via cffi
 pygments==2.18.0
@@ -54,11 +86,15 @@ pyyaml==6.0.1
     # via resutil
 requests==2.32.3
     # via boxsdk
+    # via google-api-core
+    # via google-cloud-storage
     # via requests-toolbelt
 requests-toolbelt==1.0.0
     # via boxsdk
 rich==13.7.1
     # via resutil
+rsa==4.9
+    # via google-auth
 six==1.16.0
     # via python-dateutil
 smmap==5.0.1
