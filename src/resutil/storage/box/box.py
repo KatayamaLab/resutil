@@ -33,6 +33,14 @@ class Box:
         Args:
             local_ex_path (str): path to the folder to be uploaded
         """
+        if (
+            self.client.find_subfolder_by_name(
+                basename(local_ex_path), self.project_folder.id
+            )
+            is not None
+        ):
+            return None
+
         ex_dir_name = basename(normpath(local_ex_path))
         callback(ex_dir_name)
         ex_dir = self.client.create_subfolder(ex_dir_name, self.project_folder.id)
