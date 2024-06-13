@@ -17,8 +17,8 @@
       "request": "launch",
       "module": "resutil.cli",
       "args": [
-        "push",
-        "amxru_20240606T140238_"
+        "pull",
+        "-A"
       ],
     }
   ]

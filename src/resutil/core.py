@@ -3,7 +3,7 @@ from os.path import join, exists
 
 from rich import print
 
-from .storage import Box
+from .storage import Box, GS
 from .config_file import ConfigYaml
 from .exp_file import ExpFile
 
@@ -25,6 +25,13 @@ def initialize():
         base_dir_name, project_folder_name = storage.get_info()
         print(f"  📁 Base dir: [bold]{base_dir_name}[/bold]")
         print(f"  📁 Project dir: [bold]{project_folder_name}[/bold]")
+    elif config.storage_type == "gs":
+        storage = GS(config.storage_config, config.project_name)
+        print("📦 Connected to [bold]Google Cloud Storage[/bold]")
+        project_folder_name = storage.get_info()
+        # print(f"  📁 Base dir: [bold]{base_dir_name}[/bold]")
+        print(f"  📁 Project dir: [bold]{project_folder_name}[/bold]")
+
     else:
         raise (
             ValueError(
