@@ -1,5 +1,9 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from os.path import join, exists
+from os import makedirs
+import os
+import zipfile
+import tempfile
 
 from rich import print
 
@@ -41,62 +45,81 @@ def initialize():
     return config, storage
 
 
-def upload(ex_name: str, results_dir: str, storage: Box, no_dependency=False):
+def zip_directory(folder_path, zip_path):
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, start=folder_path)
+                zipf.write(file_path, arcname)
+
+
+def upload(ex_name: str, results_dir: str, storage):
+    ex_dir_path = join(results_dir, ex_name)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        zip_path = os.path.join(temp_dir, f"{ex_name}.zip")
+        zip_directory(ex_dir_path, zip_path)
+        print(f"🗂️ Uploading: [bold]{ex_name}[/bold]")
+        storage.upload_experiment(zip_path)
+
+
+def upload_with_dependency(ex_name: str, results_dir: str, storage):
     with ThreadPoolExecutor(max_workers=10) as executor:
-        ex_dir_path = join(results_dir, ex_name)
+        recurcive_uploder(ex_name, results_dir, storage, executor)
 
-        def callback(ex_name):
-            print(f"🗂️ Uploading: [bold]{ex_name}[/bold]")
 
-        storage.upload_experiment(ex_dir_path, callback, executor)
+def recurcive_uploder(ex_name: str, results_dir: str, storage, executor):
+    ex_dir_path = join(results_dir, ex_name)
 
-        if no_dependency:
-            return
+    executor.submit(upload, ex_name, results_dir, storage)
 
-        ex_file_path = join(ex_dir_path, exp_file_name)
-        if exists(ex_file_path):
-            exp_file = ExpFile(ex_file_path)
-            for d in exp_file.dependency:
-                upload(d, results_dir, storage, no_dependency)
+    ex_file_path = join(ex_dir_path, exp_file_name)
+
+    if exists(ex_file_path):
+        exp_file = ExpFile(ex_file_path)
+        for dependency in exp_file.dependency:
+            recurcive_uploder(dependency, results_dir, storage, executor)
 
 
 def upload_all(ex_names_to_upload: list[str], results_dir: str, storage: Box):
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        for ex_name in ex_names_to_upload:
-            ex_dir_path = join(results_dir, ex_name)
-
-            def callback(ex_name):
-                print(f"🗂️ Uploading: [bold]{ex_name}[/bold]")
-
-            storage.upload_experiment(ex_dir_path, callback, executor)
-
-
-def download(ex_name: str, results_dir: str, storage: Box, no_dependency=False):
     with ThreadPoolExecutor(max_workers=10) as executor:
-        ex_dir_path = join(results_dir, ex_name)
+        for ex_name in ex_names_to_upload:
+            executor.submit(upload, ex_name, results_dir, storage)
 
-        def callback(ex_name):
-            print(f"🗂️ Downloading: [bold]{ex_name}[/bold]")
 
-        futures = storage.download_experiment(ex_dir_path, callback, executor)
+def unzip_file(zip_path, extract_to):
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        zip_ref.extractall(extract_to)
 
-        if no_dependency:
-            return
 
-        for future in as_completed(futures):
-            f = future.result()
-            if f == exp_file_name:
-                exp_file = ExpFile(join(ex_dir_path, f))
-                for d in exp_file.dependency:
-                    download(d, results_dir, storage, no_dependency)
+def download(ex_name: str, results_dir: str, storage: Box):
+    print(f"🗂️ Downloading: [bold]{ex_name}[/bold]")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        storage.download_experiment(ex_name, temp_dir)
+        ex_dir = join(results_dir, ex_name)
+        makedirs(ex_dir, exist_ok=True)
+        unzip_file(join(temp_dir, f"{ex_name}.zip"), ex_dir)
+
+
+def download_with_dependency(ex_name: str, results_dir: str, storage: Box):
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        recurcive_downloader(ex_name, results_dir, storage, executor)
+
+
+def recurcive_downloader(ex_name: str, results_dir: str, storage: Box, executor):
+    download(ex_name, results_dir, storage)
+
+    ex_file_path = join(results_dir, ex_name, exp_file_name)
+
+    if exists(ex_file_path):
+        exp_file = ExpFile(ex_file_path)
+        for d in exp_file.dependency:
+            executor.submit(recurcive_downloader, d, results_dir, storage, executor)
 
 
 def download_all(ex_names_to_download: list[str], results_dir: str, storage: Box):
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         for ex_name in ex_names_to_download:
-            ex_dir_path = join(results_dir, ex_name)
-
-            def callback(ex_name):
-                print(f"🗂️ Downloading: [bold]{ex_name}[/bold]")
-
-            storage.download_experiment(ex_dir_path, callback, executor)
+            executor.submit(download, ex_name, results_dir, storage)

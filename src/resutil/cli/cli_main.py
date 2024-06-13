@@ -12,7 +12,15 @@ from ..config_file import ConfigYaml
 from ..storage import Box
 from ..config_file import create_ex_yaml
 
-from ..core import initialize, upload, upload_all, download_all, download
+from ..core import (
+    initialize,
+    upload,
+    upload_with_dependency,
+    upload_all,
+    download_all,
+    download_with_dependency,
+    download,
+)
 
 
 config_file_path = "resutil-conf.yaml"
@@ -189,11 +197,40 @@ def command_init(args):
     print("✅ Initialized.")
 
 
+def command_push(args):
+    config, storage = initialize()
+
+    if args.experiment:
+        if args.no_dependency:
+            upload(args.experiment, config.results_dir, storage)
+        else:
+            upload_with_dependency(args.experiment, config.results_dir, storage)
+        print("✅ Uploaded")
+
+    elif args.all:
+        ex_names_to_upload = find_unuploaded_ex_dirs(config.results_dir, storage)
+
+        n = len(ex_names_to_upload)
+        if n > 0 and user_confirm(
+            f"ℹ️ There are {n} other experiment directory(s) that have not been uploaded. Do you want to upload them?",
+            default="y",
+        ):
+            upload_all(ex_names_to_upload, config.results_dir, storage)
+            print("✅ Uploaded")
+
+        elif n == 0:
+            print("✅ No experiment to upload.")
+
+
 def command_pull(args):
     config, storage = initialize()
 
     if args.experiment:
-        download(args.experiment, config.results_dir, storage, args.no_dependency)
+        if args.no_dependency:
+            download(args.experiment, config.results_dir, storage)
+        else:
+            download_with_dependency(args.experiment, config.results_dir, storage)
+
         print(args.experiment)
         print("✅ Downloaded")
 
@@ -210,29 +247,6 @@ def command_pull(args):
 
         elif n == 0:
             print("✅ No experiment to download.")
-
-
-def command_push(args):
-    config, storage = initialize()
-
-    if args.experiment:
-        upload(args.experiment, config.results_dir, storage, args.no_dependency)
-        print(args.experiment)
-        print("✅ Uploaded")
-
-    elif args.all:
-        ex_names_to_upload = find_unuploaded_ex_dirs(config.results_dir, storage)
-
-        n = len(ex_names_to_upload)
-        if n > 0 and user_confirm(
-            f"ℹ️ There are {n} other experiment directory(s) that have not been uploaded. Do you want to upload them?",
-            default="y",
-        ):
-            upload_all(ex_names_to_upload, config.results_dir, storage)
-            print("✅ Uploaded")
-
-        elif n == 0:
-            print("✅ No experiment to upload.")
 
 
 def command_add(args):
