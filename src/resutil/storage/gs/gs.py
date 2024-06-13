@@ -2,74 +2,44 @@ from os.path import basename, normpath
 from os import makedirs
 from concurrent.futures import ThreadPoolExecutor, Future
 
-from .gs_client import GSClient
+from google.cloud import storage
+from google.oauth2 import service_account
+
+from ..storage import Storage
 
 
-class GS:
+class GS(Storage):
     def __init__(self, storage_config: dict, project_name: str):
-        self.client = GSClient(
-            storage_config["key_file_path"], storage_config["backet_name"]
-        )
+        key_file_path = storage_config["key_file_path"]
+        backet_name = storage_config["backet_name"]
+        try:
+            credentials = service_account.Credentials.from_service_account_file(
+                key_file_path
+            )
 
-        # self.base_dir = self.client.find_folder(storage_config["backet_name"])
+            self.client = storage.Client(credentials=credentials)
+            self.bucket = self.client.get_bucket(backet_name)
+        except FileNotFoundError:
+            raise ValueError(f"Key file not found at {key_file_path}")
 
-        self.project_folder = project_name
-        # if self.project_folder is None:
-        #     self.project_folder = self.client.create_folder(
-        #         project_name, self.base_dir.id
-        #     )
-
-        self.project_name = project_name
+        self.project_dir = project_name
 
     def get_info(self) -> tuple[str, str, str]:
-        return self.project_folder
+        return {
+            "project_dir": self.project_dir,
+            "bucket_name": self.bucket.name,
+        }
 
-    def upload_experiment(
-        self, local_ex_path: str, callback, executor: ThreadPoolExecutor
-    ) -> None:
-        """Uploads a folder and its contents to Box.
+    def upload_experiment(self, zip_path: str):
+        blob = self.bucket.blob(f"{self.project_dir}/{basename(zip_path)}")
+        blob.upload_from_filename(zip_path)
 
-        Args:
-            local_ex_path (str): path to the folder to be uploaded
-        """
-        if (
-            self.client.find_subfolder_by_name(
-                basename(local_ex_path), self.project_folder
-            )
-            is not None
-        ):
-            return None
+        self.client.folder(self.project_dir.id).upload(zip_path, basename(zip_path))
 
-        ex_dir_name = basename(normpath(local_ex_path))
-        callback(ex_dir_name)
-
-        futures = []
-        path = f"{self.project_name}/{ex_dir_name}"
-        self.client.upload_recursively(local_ex_path, path, executor, futures)
-        return futures
-
-    def download_experiment(
-        self, local_ex_path: str, callback, executor: ThreadPoolExecutor
-    ) -> Future:
-        """Downloads a folder and its contents to Box.
-
-        Args:
-            local_ex_path (str): path to the folder to be uploaded
-        """
-        ex_dir_name = basename(normpath(local_ex_path))
-        callback(ex_dir_name)
-        makedirs(local_ex_path, exist_ok=True)
-
-        futures = []
-        path = f"{self.project_name}/{ex_dir_name}"
-        self.client.download_recursively(path, local_ex_path, executor, futures)
-        return futures
+    def download_experiment(self, zip_path: str):
+        blob = self.bucket.blob(f"{self.project_dir}/{basename(zip_path)}")
+        blob.download_to_filename(zip_path)
 
     def get_all_experiment_names(self) -> list[str]:
-        """Get all experiment names in the project folder.
-
-        Returns:
-            list[str]: List of experiment names
-        """
-        folders = self.client.get_folders_in(self.project_folder)
-        return folders
+        blobs = self.client.list_blobs(self.bucket, prefix=self.project_dir + "/")
+        return [p.name.split("/")[-1][:-4] for p in blobs]

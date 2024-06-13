@@ -73,6 +73,10 @@ def main():
     )
     parser_add.set_defaults(handler=command_add)
 
+    # list
+    parser_list = subparsers.add_parser("list", help="list remote experiments")
+    parser_list.set_defaults(handler=command_list)
+
     # args
     args = parser.parse_args()
 
@@ -180,7 +184,7 @@ def command_init(args):
         print(f"Input folder id of base dir: ", end="")
         base_dir_id = input()
 
-        storage_config = {"key_file_path": key_file_path, "base_dir_id": base_dir_id}
+        storage_config = {"key_file_path": key_file_path, "base_folder_id": base_dir_id}
 
         config.set_storage_config(storage_config)
 
@@ -268,3 +272,12 @@ def command_add(args):
     ex_dir_path = join(config.results_dir, ex_name)
 
     create_ex_yaml(ex_dir_path, dependency)
+
+
+def command_list(args):
+    config, storage = initialize()
+
+    print("📦 Remote experiment list")
+    ex_names = storage.get_all_experiment_names()
+    for ex_name in ex_names:
+        print(ex_name)

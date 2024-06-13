@@ -3,26 +3,31 @@ from os.path import basename, join
 from boxsdk import Client, JWTAuth, BoxAPIException
 from boxsdk.object.folder import Folder
 
+from ..storage import Storage
 
-class Box:
+
+class Box(Storage):
     def __init__(self, storage_config: dict, project_name: str):
+        super().__init__(storage_config, project_name)
+        # set up the Box client
         key_file_path = storage_config["key_file_path"]
         try:
             auth = JWTAuth.from_settings_file(key_file_path)
         except FileNotFoundError:
             raise ValueError(f"Key file not found at {key_file_path}")
-
         self.client = Client(auth)
 
-        self.base_dir = self._find_folder(storage_config["base_dir_id"])
+        # setup base folder
+        self.base_folder = self._find_folder(storage_config["base_folder_id"])
 
+        # set up project folder
         self.project_folder = self._find_subfolder_by_name(
-            project_name, self.base_dir.id
+            project_name, self.base_folder.id
         )
         if self.project_folder is None:
-            self.project_folder = self.client.folder(self.base_dir.id).create_subfolder(
-                project_name
-            )
+            self.project_folder = self.client.folder(
+                self.base_folder.id
+            ).create_subfolder(project_name)
 
     def _find_folder(self, folder_id: str) -> Folder:
         try:
@@ -45,22 +50,23 @@ class Box:
                 folders.append(item)
         return folders
 
-    def get_info(self) -> tuple[str, str, str]:
-        return (
-            self.base_dir.name,
-            self.project_folder.name,
-        )
+    def get_info(self) -> dict:
+        return {
+            "base_folder_id": self.base_folder.id,
+            "project_folder_id": self.project_folder.id,
+            "project_folder_name": self.project_folder.name,
+        }
 
     def upload_experiment(self, zip_path: str):
         self.client.folder(self.project_folder.id).upload(zip_path, basename(zip_path))
 
-    def download_experiment(self, ex_name: str, zip_path: str):
-        filename = ex_name + ".zip"
+    def download_experiment(self, zip_path: str):
+        filename = basename(zip_path)
         items = self.project_folder.get_items()
         for item in items:
             if item.name != filename:
                 continue
-            with open(join(zip_path, filename), "wb") as f:
+            with open(zip_path, "wb") as f:
                 f.write(item.content())
 
     def get_all_experiment_names(self) -> list[str]:

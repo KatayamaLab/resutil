@@ -43,8 +43,8 @@ class ConfigYaml:
         if self.storage_type == "box":
             if "key_file_path" not in storage_config:
                 raise ValueError("storage_config must have 'key_file_path' key")
-            if "base_dir_id" not in storage_config:
-                raise ValueError("storage_config must have 'base_dir_id' key")
+            if "base_folder_id" not in storage_config:
+                raise ValueError("storage_config must have 'base_folder_id' key")
         else:
             raise ValueError("storage_type must be 'box'")
         self.storage_config = storage_config

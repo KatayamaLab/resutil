@@ -26,15 +26,18 @@ def initialize():
     if config.storage_type == "box":
         storage = Box(config.storage_config, config.project_name)
         print("📦 Connected to [bold]box[/bold]")
-        base_dir_name, project_folder_name = storage.get_info()
-        print(f"  📁 Base dir: [bold]{base_dir_name}[/bold]")
-        print(f"  📁 Project dir: [bold]{project_folder_name}[/bold]")
+        info = storage.get_info()
+        print(f"  📁 Base dir id: [bold]{info['base_folder_id']}[/bold]")
+        print(f"  📁 Project folder name: [bold]{info['project_folder_name']}[/bold]")
+        print(
+            f"  📁 Project folder: [bold]https://app.box.com/folder/{info['project_folder_id']}[/bold]"
+        )
     elif config.storage_type == "gs":
         storage = GS(config.storage_config, config.project_name)
         print("📦 Connected to [bold]Google Cloud Storage[/bold]")
-        project_folder_name = storage.get_info()
-        # print(f"  📁 Base dir: [bold]{base_dir_name}[/bold]")
-        print(f"  📁 Project dir: [bold]{project_folder_name}[/bold]")
+        info = storage.get_info()
+        print(f"  📁 Bucket name: [bold]{info['bucket_name']}[/bold]")
+        print(f"  📁 Project dir: [bold]{info['project_dir']}[/bold]")
 
     else:
         raise (
@@ -97,7 +100,7 @@ def download(ex_name: str, results_dir: str, storage: Box):
     print(f"🗂️ Downloading: [bold]{ex_name}[/bold]")
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        storage.download_experiment(ex_name, temp_dir)
+        storage.download_experiment(join(temp_dir, ex_name + ".zip"))
         ex_dir = join(results_dir, ex_name)
         makedirs(ex_dir, exist_ok=True)
         unzip_file(join(temp_dir, f"{ex_name}.zip"), ex_dir)
