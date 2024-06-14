@@ -27,7 +27,7 @@
 Open terminal and run
 
 ```bash
-$ pip install resutil
+pip install resutil
 ```
 
 Get JWT (JSON Web Tokens) key from [Box](https://developer.box.com/guides/authentication/jwt/), and saved as `key.json`:
@@ -64,11 +64,9 @@ Input folder id of base dir: 123456789012
 
 The folder id is the Box folder ID, which is the numeric part of the URL when viewing the folder on Box (e.g., https://xxxx.app.box.com/folder/123456789012).
 
-
 A file named `resutil-conf.yaml` will be created.
 
 Modify main function in your project like:
-
 
 ```python
 
@@ -99,7 +97,7 @@ project_name: MyProj
 results_dir: results/
 storage_type: box
 storage_config:
-  base_dir_id: xxxx
+  base_folder_id: xxxx
   key_file: key.json
 ```
 
@@ -123,14 +121,25 @@ The `resutil pull` command is used to download a specific experimental data from
 
 This is useful for keeping your local data up-to-date with the data stored in the cloud, especially when multiple people are working on the same project and updating the experimental data.
 
-
 ### `resutil add`
 
-The resutil add command is used to add an experiment directory without executing any code.
+The `resutil add` command is used to add an experiment directory without executing any code.
 
-You can use it as follows: resutil `add [comment] -d [DEPENDENCY1] [DEPENDENCY2]...`. This command adds an experiment directory named "comment" and sets its dependencies. The dependencies are other experiments that this experiment depends on.
+You can use it as follows: `resutil add [comment] -d [DEPENDENCY1] [DEPENDENCY2]...`. This command adds an experiment directory named "comment" and sets its dependencies. The dependencies are other experiments that this experiment depends on.
 
 For example, if you have two experiments `exp1` and `exp2` and a new experiment depends on them, you can add the new experiment with the following command: `resutil add "new experiment" -d exp1 exp2`. This will create a new experiment directory named "new experiment" and set `exp1` and `exp2` as its dependencies.
+
+### `resutil list`
+
+The `resutil list` command list experiments in the cloud storage.
+
+### `resutil rm`
+
+The `resutil rm` command removes experiments. You can use it as follows: resutil `resutil rm [-l] [-r] EXPERIMENT1 [EXPERIMENT2]...`.  `--local` or `-l` option removes only local experiment directory, whereas `--remote` or `-r` option for experiment data in cloud. Specifying neither options removes both experiments.
+
+### `resutil comment` **EXPERIMENTAL**
+
+`resutil comment [EXPERIMENT] [COMMENT]` add or modify a comment following timestamp in the experiment name. Both local and cloud experiment name will change if existing. It should be noted that Resutil regards a differnt experimental name as a different experiment, and this does not affect the name of the same experiment other users have already pull.
 
 ## Directory structure in the cloud storage
 
@@ -167,5 +176,3 @@ dependency: Dependencies (automatically extracted from directories in the comman
   - ex1
   - ex2
 ```
-
-

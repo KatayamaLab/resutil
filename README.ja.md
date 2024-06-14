@@ -26,7 +26,7 @@
 ターミナルを開いて以下を実行
 
 ```bash
-$ pip install resutil
+pip install resutil
 ```
 
 [Box](https://developer.box.com/guides/authentication/jwt/)からJWT（JSON Web Tokens）キーを取得し、`key.json`として保存します。
@@ -95,7 +95,7 @@ project_name: MyProj
 results_dir: results/
 storage_type: box
 storage_config:
-  base_dir_id: xxxx
+  base_folder_id: xxxx
   key_file: key.json
 ```
 
@@ -106,7 +106,6 @@ storage_config:
 `resutil push [exp_name]`は、特定のディレクトリの実験データをクラウドにアップロードします。`exp-config.yaml`に含まれる依存ディレクトリは自動的にアップロードされます。`--no-dependency`オプションを使用すると、自動依存アップロードが制限されます。
 
 `resutil push --all`は、すべての実験データをクラウドにアップロードします。
-
 
 ### `resutil pull`
 
@@ -125,6 +124,15 @@ storage_config:
 以下のように使用できます: `resutil add [コメント] -d [依存関係1] [依存関係2]...`。このコマンドは、"コメント"という名前の実験ディレクトリを追加し、その依存関係を設定します。依存関係は、この実験が依存する他の実験です。
 
 例えば、`exp1`と`exp2`という2つの実験があり、新しい実験がそれらに依存している場合、次のコマンドで新しい実験を追加できます: `resutil add "新しい実験" -d exp1 exp2`。これにより、"新しい実験"という名前の新しい実験ディレクトリが作成され、`exp1`と`exp2`がその依存関係として設定されます。
+
+### `resutil rm`
+
+`resutil rm` コマンドは実験を削除します。次のように使用できます：`resutil rm [-l] [-r] EXPERIMENT1 [EXPERIMENT2]...`。`--local` または `-l` オプションはローカルの実験ディレクトリのみを削除し、`--remote` または `-r` オプションはクラウド上の実験データを削除します。オプションを指定しない場合、両方の実験データを削除します。
+
+### `resutil comment` **実験的機能**
+
+`resutil comment [EXPERIMENT] [COMMENT]` は、タイムスタンプに続いて実験名にコメントを追加または変更します。既存の実験名が存在する場合、ローカルとクラウドの両方の実験名が変更されます。Resutil は異なる実験名を異なる実験として認識するため、これは他のユーザーが既にプルしている同じ実験の名前には影響しないことに注意してください。
+
 ## クラウドストレージのディレクトリ構成
 
 ```plaintext

@@ -34,8 +34,6 @@ class GS(Storage):
         blob = self.bucket.blob(f"{self.project_dir}/{basename(zip_path)}")
         blob.upload_from_filename(zip_path)
 
-        self.client.folder(self.project_dir.id).upload(zip_path, basename(zip_path))
-
     def download_experiment(self, zip_path: str):
         blob = self.bucket.blob(f"{self.project_dir}/{basename(zip_path)}")
         blob.download_to_filename(zip_path)
@@ -43,3 +41,16 @@ class GS(Storage):
     def get_all_experiment_names(self) -> list[str]:
         blobs = self.client.list_blobs(self.bucket, prefix=self.project_dir + "/")
         return [p.name.split("/")[-1][:-4] for p in blobs]
+
+    def remove_experiment(self, ex_name: str):
+        blob = self.bucket.blob(self.project_dir + "/" + ex_name + ".zip")
+        blob.delete()
+
+    def change_comment(self, ex_name, new_comment):
+        new_ex_name = f"{ex_name.split('_')[0]}_{ex_name.split('_')[1]}_{new_comment}"
+        old_name = self.project_dir + "/" + ex_name + ".zip"
+        new_name = self.project_dir + "/" + new_ex_name + ".zip"
+        old_blob = self.bucket.blob(old_name)
+
+        self.bucket.copy_blob(old_blob, self.bucket, new_name)
+        old_blob.delete()

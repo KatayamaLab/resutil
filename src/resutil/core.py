@@ -4,6 +4,8 @@ from os import makedirs
 import os
 import zipfile
 import tempfile
+import shutil
+
 
 from rich import print
 
@@ -126,3 +128,23 @@ def download_all(ex_names_to_download: list[str], results_dir: str, storage: Box
     with ThreadPoolExecutor(max_workers=10) as executor:
         for ex_name in ex_names_to_download:
             executor.submit(download, ex_name, results_dir, storage)
+
+
+def remove_local(ex_names: list[str], results_dir: str):
+    for ex_name in ex_names:
+        path = join(results_dir, ex_name)
+        if exists(path):
+            print(f"🗑️ Removing (local): [bold]{ex_name}[/bold]")
+            shutil.rmtree(path)
+        else:
+            print(f"⚠️ {ex_name} does not exist in the local directory.")
+
+
+def remove_remote(ex_names: list[str], storage):
+    ex_names_all = storage.get_all_experiment_names()
+    for ex_name in ex_names:
+        if ex_name in ex_names_all:
+            print(f"🗑️ Removing (remote): [bold]{ex_name}[/bold]")
+            storage.remove_experiment(ex_name)
+        else:
+            print(f"⚠️ {ex_name} does not exist in the remote directory.")
