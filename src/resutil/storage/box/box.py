@@ -76,3 +76,11 @@ class Box(Storage):
             if item.type == "file" and item.name[-3:] == "zip":
                 folders.append(item.name[:-4])
         return folders
+
+    def remove_experiment(self, ex_name: str):
+        items = self.client.folder(self.project_folder.id).get_items()
+        for item in items:
+            if item.name == ex_name + ".zip":
+                self.client.file(item.id).delete()
+                return
+        raise ValueError(f"Experiment {ex_name} not found")

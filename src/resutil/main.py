@@ -2,6 +2,7 @@ from functools import wraps
 from datetime import datetime
 from os.path import join
 import sys
+import traceback
 
 from rich import print
 
@@ -70,22 +71,39 @@ def main(verbose=True):
 
             try:
                 func(resutil_args(ex_dir_path), *args, **kwargs)
+                print("")
+                upload(ex_name, config.results_dir, storage)
+
             except KeyboardInterrupt:
                 print("")
                 if user_confirm(
                     "🔔 Interrupted by user. Do you want to [bold]delete[/bold] experiment file for trial?",
                     default="n",
                 ) and user_confirm(
-                    "🔔 Are your sure to [bold]DELETE[/bold] it?",
+                    ".....Are your sure to [bold]DELETE[/bold] it?",
                     default="n",
                 ):
                     delete_ex_dir(ex_dir_path)
                     print(f"🗑️  Deleted [bold]{ex_dir_path}[/bold]")
-                    print("⛔️ Aborted")
-
-            print("")
-
-            upload(ex_name, config.results_dir, storage)
+                else:
+                    upload(ex_name, config.results_dir, storage)
+            except Exception as e:
+                print("")
+                if user_confirm(
+                    "❌ An Exception has occured. Do you want to [bold]delete[/bold] experiment file for trial?",
+                    default="n",
+                ) and user_confirm(
+                    ".....Are your sure to [bold]DELETE[/bold] it?",
+                    default="n",
+                ):
+                    delete_ex_dir(ex_dir_path)
+                    print(f"🗑️  Deleted [bold]{ex_dir_path}[/bold]")
+                else:
+                    upload(ex_name, config.results_dir, storage)
+                print("❌ Please check the error message below:")
+                print("----------------------------------")
+                traceback.print_exception(type(e), e, e.__traceback__)
+                print("----------------------------------")
 
             ex_names_to_upload = find_unuploaded_ex_dirs(config.results_dir, storage)
 
