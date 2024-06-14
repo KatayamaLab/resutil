@@ -27,7 +27,7 @@
 Open terminal and run
 
 ```bash
-$ pip install resutil
+pip install resutil
 ```
 
 Get JWT (JSON Web Tokens) key from [Box](https://developer.box.com/guides/authentication/jwt/), and saved as `key.json`:
@@ -64,11 +64,9 @@ Input folder id of base dir: 123456789012
 
 The folder id is the Box folder ID, which is the numeric part of the URL when viewing the folder on Box (e.g., https://xxxx.app.box.com/folder/123456789012).
 
-
 A file named `resutil-conf.yaml` will be created.
 
 Modify main function in your project like:
-
 
 ```python
 
@@ -123,7 +121,6 @@ The `resutil pull` command is used to download a specific experimental data from
 
 This is useful for keeping your local data up-to-date with the data stored in the cloud, especially when multiple people are working on the same project and updating the experimental data.
 
-
 ### `resutil add`
 
 The `resutil add` command is used to add an experiment directory without executing any code.
@@ -139,7 +136,6 @@ The `resutil list` command list experiments in the cloud storage.
 ### `resutil rm`
 
 The `resutil rm` command removes experiments. You can use it as follows: resutil `resutil rm [-l] [-r] EXPERIMENT1 [EXPERIMENT2]...`.  `--local` or `-l` option removes only local experiment directory, whereas `--remote` or `-r` option for experiment data in cloud. Specifying neither options removes both experiments.
-
 
 ### `resutil comment` **EXPERIMENTAL**
 
@@ -180,5 +176,3 @@ dependency: Dependencies (automatically extracted from directories in the comman
   - ex1
   - ex2
 ```
-
-
