@@ -29,6 +29,16 @@ def create_ex_dir(now, comment, results_dir):
     return ex_name
 
 
+def change_comment(results_dir, ex_name, new_comment):
+    ex_dir_path = os.path.join(results_dir, ex_name)
+    if not os.path.isdir(ex_dir_path):
+        raise FileNotFoundError(f"{ex_dir_path} does not exist")
+    new_ex_name = f"{ex_name.split('_')[0]}_{ex_name.split('_')[1]}_{new_comment}"
+    new_ex_dir_path = os.path.join(results_dir, new_ex_name)
+    os.rename(ex_dir_path, new_ex_dir_path)
+    return new_ex_name
+
+
 def get_ex_dir_names(results_dir):
     ex_dir_paths = glob(join(results_dir + "/*/"))
     ex_dir_names = [basename(normpath(p)) for p in ex_dir_paths]
@@ -56,7 +66,6 @@ def find_undownloaded_ex_dirs(results_dir_path, storage):
 
 
 def delete_ex_dir(ex_dir_path):
-    # check valid path
     if parse_result_dirs(ex_dir_path) == []:
         raise ValueError(f"{ex_dir_path} does not exist")
     if os.path.exists(ex_dir_path):

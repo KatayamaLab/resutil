@@ -45,3 +45,12 @@ class GS(Storage):
     def remove_experiment(self, ex_name: str):
         blob = self.bucket.blob(self.project_dir + "/" + ex_name + ".zip")
         blob.delete()
+
+    def change_comment(self, ex_name, new_comment):
+        new_ex_name = f"{ex_name.split('_')[0]}_{ex_name.split('_')[1]}_{new_comment}"
+        old_name = self.project_dir + "/" + ex_name + ".zip"
+        new_name = self.project_dir + "/" + new_ex_name + ".zip"
+        old_blob = self.bucket.blob(old_name)
+
+        self.bucket.copy_blob(old_blob, self.bucket, new_name)
+        old_blob.delete()

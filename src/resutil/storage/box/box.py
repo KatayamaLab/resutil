@@ -84,3 +84,13 @@ class Box(Storage):
                 self.client.file(item.id).delete()
                 return
         raise ValueError(f"Experiment {ex_name} not found")
+
+    def change_comment(self, ex_name, new_comment):
+        items = self.client.folder(self.project_folder.id).get_items()
+        new_ex_name = f"{ex_name.split('_')[0]}_{ex_name.split('_')[1]}_{new_comment}"
+
+        for item in items:
+            if item.name == ex_name + ".zip":
+                self.client.file(item.id).rename(new_ex_name + ".zip")
+                return
+        raise ValueError(f"Experiment {ex_name} not found")

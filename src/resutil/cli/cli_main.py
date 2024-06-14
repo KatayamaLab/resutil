@@ -5,7 +5,12 @@ from datetime import datetime
 
 from rich import print
 
-from ..ex_dir import find_undownloaded_ex_dirs, find_unuploaded_ex_dirs, create_ex_dir
+from ..ex_dir import (
+    find_undownloaded_ex_dirs,
+    find_unuploaded_ex_dirs,
+    create_ex_dir,
+    change_comment,
+)
 from ..utils import user_confirm
 from ..config_file import ConfigYaml, create_ex_yaml
 from ..storage import Box
@@ -96,6 +101,18 @@ def main():
         nargs="+",
     )
     parser_rm.set_defaults(handler=command_rm)
+
+    # comment
+    parser_comment = subparsers.add_parser(
+        "comment", help="Change comment of experiment"
+    )
+    parser_comment.add_argument(
+        "EXPERIMENT",
+    )
+    parser_comment.add_argument(
+        "NEWCOMMENT",
+    )
+    parser_comment.set_defaults(handler=command_comment)
 
     # args
     args = parser.parse_args()
@@ -313,3 +330,30 @@ def command_rm(args):
     else:
         remove_local(args.EXPERIMENT, config.results_dir)
         remove_remote(args.EXPERIMENT, storage)
+
+
+def command_comment(args):
+    config, storage = initialize()
+
+    ex_name = args.EXPERIMENT
+    comment = args.NEWCOMMENT
+
+    ex_names_remote = storage.get_all_experiment_names()
+    ex_names_local = os.listdir(config.results_dir)
+
+    exist_local = ex_name in ex_names_local
+    exist_remote = ex_name in ex_names_remote
+
+    new_ex_name = f"{ex_name.split('_')[0]}_{ex_name.split('_')[1]}_{comment}"
+
+    if not exist_local and not exist_remote:
+        print(f"ℹ️ {ex_name} does not exist")
+        return
+    if exist_local:
+        new_ex_name = change_comment(config.results_dir, ex_name, comment)
+        # rename directory
+        print(f"ℹ️ local experiment directory has been changed to {new_ex_name}.")
+    if exist_remote:
+        storage.change_comment(ex_name, comment)
+
+    print(f"✅ Renamed [bold]{ex_name}[/bold] to [bold]{new_ex_name}[/bold]")

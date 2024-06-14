@@ -1,8 +1,8 @@
 from datetime import datetime
-
+import os
 import pytest
 
-from resutil.ex_dir import create_ex_dir, delete_ex_dir
+from resutil.ex_dir import create_ex_dir, delete_ex_dir, change_comment
 
 
 def test_create_ex_dir(mocker):
@@ -19,3 +19,10 @@ def test_delete_ex_dir(mocker):
     with pytest.raises(ValueError) as exec_info:
         delete_ex_dir("aaa")
     assert str(exec_info.value) == "aaa does not exist"
+
+
+def test_change_comment_():
+    os.makedirs("results/aaaaaa_20240101T000000_test")
+    new_ex_name = change_comment("results", "aaaaaa_20240101T000000_test", "new_test")
+    assert new_ex_name == "aaaaaa_20240101T000000_new_test"
+    os.rmdir("results/aaaaaa_20240101T000000_new_test")
