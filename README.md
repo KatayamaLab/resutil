@@ -99,7 +99,7 @@ project_name: MyProj
 results_dir: results/
 storage_type: box
 storage_config:
-  base_dir_id: xxxx
+  base_folder_id: xxxx
   key_file: key.json
 ```
 
@@ -126,11 +126,24 @@ This is useful for keeping your local data up-to-date with the data stored in th
 
 ### `resutil add`
 
-The resutil add command is used to add an experiment directory without executing any code.
+The `resutil add` command is used to add an experiment directory without executing any code.
 
-You can use it as follows: resutil `add [comment] -d [DEPENDENCY1] [DEPENDENCY2]...`. This command adds an experiment directory named "comment" and sets its dependencies. The dependencies are other experiments that this experiment depends on.
+You can use it as follows: `resutil add [comment] -d [DEPENDENCY1] [DEPENDENCY2]...`. This command adds an experiment directory named "comment" and sets its dependencies. The dependencies are other experiments that this experiment depends on.
 
 For example, if you have two experiments `exp1` and `exp2` and a new experiment depends on them, you can add the new experiment with the following command: `resutil add "new experiment" -d exp1 exp2`. This will create a new experiment directory named "new experiment" and set `exp1` and `exp2` as its dependencies.
+
+### `resutil list`
+
+The `resutil list` command list experiments in the cloud storage.
+
+### `resutil rm`
+
+The `resutil rm` command removes experiments. You can use it as follows: resutil `resutil rm [-l] [-r] EXPERIMENT1 [EXPERIMENT2]...`.  `--local` or `-l` option removes only local experiment directory, whereas `--remote` or `-r` option for experiment data in cloud. Specifying neither options removes both experiments.
+
+
+### `resutil comment` **EXPERIMENTAL**
+
+`resutil comment [EXPERIMENT] [COMMENT]` add or modify a comment following timestamp in the experiment name. Both local and cloud experiment name will change if existing. It should be noted that Resutil regards a differnt experimental name as a different experiment, and this does not affect the name of the same experiment other users have already pull.
 
 ## Directory structure in the cloud storage
 
