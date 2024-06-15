@@ -1,0 +1,42 @@
+name: Publish Python Package
+
+on:
+  push:
+    tags:
+      - 'v*'  # タグが v で始まる場合にトリガー
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+
+    # - name: Set up Rye and 
+    #   uses: actions/setup-python@v4
+    #   with:
+    #     python-version: '3.x'  # 必要なPythonバージョンを指定
+
+
+    - name: Enable caching and define a custom cache key prefix
+      id: setup-rye
+      uses: eifinger/setup-rye@v3
+      with:
+        enable-cache: true
+        cache-prefix: 'resutil-rye'
+
+    - name: Build
+      run: |
+        rye sync
+        rye build --wheel
+
+    - name: Save build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/*
+
+    - name: Deploy
+      run: |
+        rye publish --yes --token ${{ secrets.PYPI_TOKEN }}
