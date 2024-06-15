@@ -12,6 +12,7 @@ from rich import print
 from .storage import Box, GS
 from .config_file import ConfigYaml
 from .exp_file import ExpFile
+from .ex_dir import get_ex_dir_names
 
 config_file_name = "resutil-conf.yaml"
 exp_file_name = "resutil-exp.yaml"
@@ -148,3 +149,16 @@ def remove_remote(ex_names: list[str], storage):
             storage.remove_experiment(ex_name)
         else:
             print(f"⚠️ {ex_name} does not exist in the remote directory.")
+
+
+def get_past_comments(results_dir: str):
+    ex_dir_names = get_ex_dir_names(results_dir)
+    sorted_ex_dir_names = sorted(ex_dir_names, reverse=True)
+
+    comments = []
+    for ex in sorted_ex_dir_names:
+        item = ex.split("_")
+        if len(item) == 3:
+            comments.append(item[2])
+
+    return list(set(comments))

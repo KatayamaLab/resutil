@@ -1,5 +1,6 @@
 import re
 from rich import print
+import readline
 
 
 def to_base26(n):
@@ -42,3 +43,22 @@ def user_confirm(question: str, default="") -> bool:
         if "Please try again - " not in question:
             new_question = f"Please try again - {question}"
         return user_confirm(new_question, default)
+
+
+def verify_comment(comment: str) -> bool:
+    invalid_chars_pattern = r'[\\/:*?"<>|]'
+    return not re.search(invalid_chars_pattern, comment) and len(comment) <= 200
+
+
+def input_with_default(prompt, default=""):
+    def hook():
+        readline.insert_text(default)
+        readline.redisplay()
+
+    print(prompt, end="")
+
+    readline.set_pre_input_hook(hook)
+    try:
+        return input("")
+    finally:
+        readline.set_pre_input_hook()
