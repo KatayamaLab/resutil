@@ -37,7 +37,8 @@ def main(verbose=True):
             print("")
             while True:
                 comment = prompt(
-                    f"📝 Input comment for this experiment: ", completer=comments
+                    f"📝 Input comment for this experiment (press [tab] key to completion): ",
+                    completer=comments,
                 )
                 if verify_comment(comment):
                     break
