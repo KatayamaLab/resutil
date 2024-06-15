@@ -5,13 +5,15 @@ import sys
 import traceback
 
 from rich import print
+from prompt_toolkit import prompt
+from prompt_toolkit.completion import WordCompleter
 
-from .utils import user_confirm, parse_result_dirs
+from .utils import user_confirm, parse_result_dirs, verify_comment
 from .config_file import create_ex_yaml
 from .ex_dir import create_ex_dir, delete_ex_dir, find_unuploaded_ex_dirs
 from .git import find_git_repo, get_git_info, store_uncomited
 
-from .core import initialize, upload, upload_all
+from .core import initialize, upload, upload_all, get_past_comments
 
 
 class resutil_args:
@@ -30,9 +32,19 @@ def main(verbose=True):
 
             config, storage = initialize()
 
-            print("")
+            comments = WordCompleter(get_past_comments(config.results_dir))
 
-            comment = input("📝 Input comment for this experiment: ")
+            print("")
+            while True:
+                comment = prompt(
+                    f"📝 Input comment for this experiment (press [tab] key to completion): ",
+                    completer=comments,
+                )
+                if verify_comment(comment):
+                    break
+                print(
+                    '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
+                )
 
             print("")
 

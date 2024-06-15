@@ -11,7 +11,7 @@ from ..ex_dir import (
     create_ex_dir,
     change_comment,
 )
-from ..utils import user_confirm
+from ..utils import user_confirm, verify_comment
 from ..config_file import ConfigYaml, create_ex_yaml
 from ..storage import Box
 
@@ -294,7 +294,14 @@ def command_add(args):
     config, _ = initialize()
 
     if args.comment is None:
-        comment = input("📝 Input comment for this experiment: ")
+        while True:
+            comment = input("📝 Input comment for this experiment: ")
+            if verify_comment(comment):
+                break
+            print(
+                '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
+            )
+
     else:
         comment = args.comment
         print(f"com: {comment}")
@@ -337,6 +344,14 @@ def command_comment(args):
 
     ex_name = args.EXPERIMENT
     comment = args.NEWCOMMENT
+
+    while True:
+        if verify_comment(comment):
+            break
+        print(
+            '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
+        )
+        comment = input("📝 Input comment for this experiment: ")
 
     ex_names_remote = storage.get_all_experiment_names()
     ex_names_local = os.listdir(config.results_dir)
