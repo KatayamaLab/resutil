@@ -1,0 +1,37 @@
+name: Publish Python Package
+
+on:
+  push:
+    tags:
+      - 'v*'  # タグが v で始まる場合にトリガー
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+
+    # - name: Set up Rye and 
+    #   uses: actions/setup-python@v4
+    #   with:
+    #     python-version: '3.x'  # 必要なPythonバージョンを指定
+
+
+    - name: Activate rye and activate
+      run: |
+        curl -sSf https://rye-up.com/get | RYE_INSTALL_OPTION="--yes" bash
+        source $HOME/.rye/env
+        rye sync
+        source .venv/bin/activate
+
+    - name: Build
+      run: |
+        rye build --wheel
+
+    - name: Save build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/*
