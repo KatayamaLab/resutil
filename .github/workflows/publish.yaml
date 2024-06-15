@@ -28,6 +28,7 @@ jobs:
 
     - name: Build
       run: |
+        rye sync
         rye build --wheel
 
     - name: Save build artifacts
