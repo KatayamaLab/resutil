@@ -19,13 +19,12 @@ jobs:
     #     python-version: '3.x'  # 必要なPythonバージョンを指定
 
 
-    - name: Activate rye and activate
-      run: |
-        curl -sSf https://rye.astral.sh/get | RYE_INSTALL_OPTION="--yes" bash
-
-        source $HOME/.rye/env
-        rye sync
-        source .venv/bin/activate
+    - name: Enable caching and define a custom cache key prefix
+      id: setup-rye
+      uses: eifinger/setup-rye@v3
+      with:
+        enable-cache: true
+        cache-prefix: 'resutil-rye'
 
     - name: Build
       run: |
