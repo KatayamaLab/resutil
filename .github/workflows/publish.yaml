@@ -36,3 +36,7 @@ jobs:
       with:
         name: dist
         path: dist/*
+
+    - name: Deploy
+      run: |
+        rye publish --yes --username ${{ secrets.PYPI_USERNAME }} --token ${{ secrets.PYPI_PASSWORD }}
