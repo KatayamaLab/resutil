@@ -39,4 +39,4 @@ jobs:
 
     - name: Deploy
       run: |
-        rye publish --yes --username ${{ secrets.PYPI_USERNAME }} --token ${{ secrets.PYPI_PASSWORD }}
+        rye publish --yes --token ${{ secrets.PYPI_TOKEN }}
