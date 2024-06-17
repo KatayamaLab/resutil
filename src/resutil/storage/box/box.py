@@ -29,6 +29,8 @@ class Box(Storage):
                 self.base_folder.id
             ).create_subfolder(project_name)
 
+        self.max_workers = 10
+
     def _find_folder(self, folder_id: str) -> Folder:
         try:
             return self.client.folder(folder_id).get()

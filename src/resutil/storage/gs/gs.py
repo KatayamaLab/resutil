@@ -24,6 +24,8 @@ class GS(Storage):
 
         self.project_dir = project_name
 
+        self.max_workers = 10
+
     def get_info(self) -> tuple[str, str, str]:
         return {
             "project_dir": self.project_dir,
