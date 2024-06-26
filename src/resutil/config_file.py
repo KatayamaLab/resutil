@@ -34,8 +34,8 @@ class ConfigYaml:
         self.results_dir = results_dir
 
     def set_storage_type(self, storage_type: str):
-        if storage_type not in ["box", "gs", "gdrive"]:
-            raise ValueError("storage_type must be 'local', 'box', 'gs' or 'gdrive'")
+        if storage_type not in ["box", "gs", "gcs", "gdrive"]:
+            raise ValueError("storage_type must be 'local', 'box', 'gcs' or 'gdrive'")
         self.storage_type = storage_type
 
     def set_storage_config(self, storage_config):
@@ -45,7 +45,7 @@ class ConfigYaml:
                 raise ValueError("storage_config must have 'key_file_path' key")
             if "base_folder_id" not in storage_config:
                 raise ValueError("storage_config must have 'base_folder_id' key")
-        elif self.storage_type == "gs":
+        elif self.storage_type == "gs" or self.storage_type == "gs":
             if "key_file_path" not in storage_config:
                 raise ValueError("storage_config must have 'key_file_path' key")
             if "backet_name" not in storage_config:
@@ -76,9 +76,9 @@ def create_ex_yaml(
     commit_hash: Optional[str] = None,
     uncommited_files: list[str] = [],
 ):
-    cmd = " ".join(sys.argv)
+    args = " ".join(sys.argv)
     data = {
-        "cmd": cmd,
+        "args": args,
         "result_dir": dir,
         "dependency": dependency,
         "git": {

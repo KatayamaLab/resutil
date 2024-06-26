@@ -13,7 +13,7 @@ from ..ex_dir import (
 )
 from ..utils import user_confirm, verify_comment
 from ..config_file import ConfigYaml, create_ex_yaml
-from ..storage import Box, GS, GDrive
+from ..storage import Box, GCS, GDrive
 
 from ..core import (
     initialize,
@@ -196,10 +196,10 @@ def command_init(args):
     # set storage type
     while True:
         d = "box"
-        print(f"Input storage_type [bold]({d})[/bold]: ", end="")
+        print(f"Input storage_type ([bold]box[/bold]/gcs/gdrive): ", end="")
         s = input()
         storage_type = s if s != "" else "box"
-        if storage_type in ["box", "gs", "gdrive"]:
+        if storage_type in ["box", "gcs", "gdrive"]:
             break
     config.set_storage_type(storage_type)
 
@@ -233,7 +233,7 @@ def command_init(args):
             return
 
     # set box config
-    elif storage_type == "gs":
+    elif storage_type == "gcs":
         d = "key.json"
         print(f"Input key file_path [bold]({d})[/bold]: ", end="")
         s = input()
@@ -255,7 +255,7 @@ def command_init(args):
         config.set_storage_config(storage_config)
 
         try:
-            GS(config.storage_config, config.project_name)
+            GCS(config.storage_config, config.project_name)
         except Exception as e:
             print("❌ Failed to connect to storage.")
             print(f"  [red]{e}[/red]")

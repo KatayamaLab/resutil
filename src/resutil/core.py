@@ -9,7 +9,7 @@ import shutil
 
 from rich import print
 
-from .storage import Box, GS, GDrive
+from .storage import Box, GCS, GDrive
 from .config_file import ConfigYaml
 from .exp_file import ExpFile
 from .ex_dir import get_ex_dir_names
@@ -35,8 +35,8 @@ def initialize():
         print(
             f"  📁 Project folder: [bold]https://app.box.com/folder/{info['project_folder_id']}[/bold]"
         )
-    elif config.storage_type == "gs":
-        storage = GS(config.storage_config, config.project_name)
+    elif config.storage_type == "gcs" or config.storage_type == "gs":
+        storage = GCS(config.storage_config, config.project_name)
         print("📦 Connected to [bold]Google Cloud Storage[/bold]")
         info = storage.get_info()
         print(f"  📁 Bucket name: [bold]{info['bucket_name']}[/bold]")
