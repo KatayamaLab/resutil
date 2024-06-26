@@ -86,6 +86,91 @@ if __name__ == "__main__":
     main_func()
 ```
 
+## How to setup cloud storage for Resutil
+
+Resutil supports Google Cloud Storage, Google Drive, and Box for a cloud storage to store result files. To connect these cloud services following setup will be required.
+
+### Google Cloud Storage
+
+
+1. **Create a Project**:
+    - If you don't already have a project, go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
+2. **Enable the Cloud Storage API**:
+    - Go to the [API Library](https://console.cloud.google.com/apis/library) in the Google Cloud Console.
+    - Search for "Cloud Storage" and enable the API for your project.
+3. **Create a Storage Bucket**:
+    - In the Google Cloud Console, go to the [Cloud Storage Browser](https://console.cloud.google.com/storage/browser).
+    - Click on "Create Bucket."
+    - Follow the prompts to name your bucket, select a storage class, and set the location for your bucket.
+4. **Create a Service Account**:
+    - In the Google Cloud Console, go to the [IAM & Admin](https://console.cloud.google.com/iam-admin/serviceaccounts) section.
+    - Click on "Create Service Account."
+    - Provide a name and description for the service account, and click "Create."
+5. **Grant Permissions to the Service Account**:
+    - Select the roles that grant the necessary permissions to the service account. For example, to access Cloud Storage, you might choose the "Storage Admin" role.
+    - Click "Continue," and then "Done."
+6. **Create and Download a Key for the Service Account**:
+    - Click on the service account you just created.
+    - Go to the "Keys" tab.
+    - Click "Add Key," then "Create New Key."
+    - Choose "JSON" as the key type, and click "Create." The key file will be downloaded to your computer.
+
+
+1. Create a Google Cloud Storage bucket via the Cloud Console.
+2. Create a service account and generate a JWT key (JSON key file) in the Cloud Console.
+3. Use the key file in your application to authenticate and interact with Google Cloud Storage.
+
+This process ensures that you have the necessary setup to use Google Cloud Storage securely with service account credentials.
+
+### Google Drive
+
+Sure! Here are the steps to set up a folder in Google Drive and obtain a JWT key to access the storage programmatically:
+
+### Step 1: Set Up a Folder in Google Drive
+
+1. **Create a Folder in Google Drive**:
+    - Open [Google Drive](https://drive.google.com/).
+    - Click on "New" and select "Folder."
+    - Name the folder and click "Create."
+2. **Get the Folder ID**:
+    - Navigate to the folder you just created.
+    - The folder ID is the part of the URL after `folders/`. For example, in the URL `https://drive.google.com/drive/folders/1a2b3c4d5e6f`, the folder ID is `1a2b3c4d5e6f`.
+3. **Create a Service Account**:
+    - Go to the [Google Cloud Console](https://console.cloud.google.com/).
+    - Select your project or create a new one.
+    - Navigate to the [IAM & Admin](https://console.cloud.google.com/iam-admin/serviceaccounts) section.
+    - Click "Create Service Account."
+    - Provide a name and description for the service account, and click "Create."
+4. **Grant Permissions to the Service Account**:
+    - Assign the `Editor` role or a custom role that includes `drive.file` permission.
+    - Click "Continue," and then "Done."
+5. **Create and Download a Key for the Service Account**:
+    - Click on the service account you just created.
+    - Go to the "Keys" tab.
+    - Click "Add Key," then "Create New Key."
+    - Choose "JSON" as the key type, and click "Create." The key file will be downloaded to your computer.
+6. **Enable the Google Drive API**:
+    - Go to the [API Library](https://console.cloud.google.com/apis/library) in the Google Cloud Console.
+    - Search for "Google Drive API" and enable it for your project.
+7. **Share the Folder**:
+    - In Google Drive, right-click on the folder you created.
+    - Select "Share."
+    - In the "Share with people and groups" field, enter the email address of the service account (you can find this in the JSON key file under `client_email`).
+    - Give the service account `Editor` access.
+    - Click "Send."
+
+
+
+1. Enable Google Drive API
+2. Create a service account
+3. Create a folder in Google Drive
+4. Get the id of the created folder, which is started with 1_. https://drive.google.com/drive/folders/1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+### Box
+
+
+
+
 ## Commands
 
 ### `resutil init`
