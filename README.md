@@ -92,7 +92,6 @@ Resutil supports Google Cloud Storage, Google Drive, and Box for a cloud storage
 
 ### Google Cloud Storage
 
-
 1. **Create a Project**:
     - If you don't already have a project, go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
 2. **Enable the Cloud Storage API**:
@@ -115,18 +114,7 @@ Resutil supports Google Cloud Storage, Google Drive, and Box for a cloud storage
     - Click "Add Key," then "Create New Key."
     - Choose "JSON" as the key type, and click "Create." The key file will be downloaded to your computer.
 
-
-1. Create a Google Cloud Storage bucket via the Cloud Console.
-2. Create a service account and generate a JWT key (JSON key file) in the Cloud Console.
-3. Use the key file in your application to authenticate and interact with Google Cloud Storage.
-
-This process ensures that you have the necessary setup to use Google Cloud Storage securely with service account credentials.
-
 ### Google Drive
-
-Sure! Here are the steps to set up a folder in Google Drive and obtain a JWT key to access the storage programmatically:
-
-### Step 1: Set Up a Folder in Google Drive
 
 1. **Create a Folder in Google Drive**:
     - Open [Google Drive](https://drive.google.com/).
@@ -141,36 +129,43 @@ Sure! Here are the steps to set up a folder in Google Drive and obtain a JWT key
     - Navigate to the [IAM & Admin](https://console.cloud.google.com/iam-admin/serviceaccounts) section.
     - Click "Create Service Account."
     - Provide a name and description for the service account, and click "Create."
-4. **Grant Permissions to the Service Account**:
-    - Assign the `Editor` role or a custom role that includes `drive.file` permission.
-    - Click "Continue," and then "Done."
-5. **Create and Download a Key for the Service Account**:
+4. **Create and Download a Key for the Service Account**:
     - Click on the service account you just created.
     - Go to the "Keys" tab.
     - Click "Add Key," then "Create New Key."
     - Choose "JSON" as the key type, and click "Create." The key file will be downloaded to your computer.
-6. **Enable the Google Drive API**:
+5. **Enable the Google Drive API**:
     - Go to the [API Library](https://console.cloud.google.com/apis/library) in the Google Cloud Console.
     - Search for "Google Drive API" and enable it for your project.
-7. **Share the Folder**:
+6. **Share the Folder**:
     - In Google Drive, right-click on the folder you created.
     - Select "Share."
     - In the "Share with people and groups" field, enter the email address of the service account (you can find this in the JSON key file under `client_email`).
     - Give the service account `Editor` access.
     - Click "Send."
 
-
-
-1. Enable Google Drive API
-2. Create a service account
-3. Create a folder in Google Drive
-4. Get the id of the created folder, which is started with 1_. https://drive.google.com/drive/folders/1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
 ### Box
 
+Sure, I can guide you through the process of obtaining a JWT (JSON Web Token) from Box's developer console. Follow these steps:
 
+1. **Create a Box Application**
+    - Go to the [Box Developer Console](https://account.box.com/login) and log in with your Box account.
+    - Click on "Create New App".
+    - Give your app a name and click "Next".
+    - Choose "Custom App" and select "Server Authentication (with JWT)".
 
+2. **Configure Your Application**
+    - In your app's settings, go to the "Configuration" tab.
+    - Under "Application Scopes", choose two access levels, "Read/Write all files and folders stored in Box".
+    - Scroll down to the "Add and Manage Public Keys" section and click "Generate a Public/Private Keypair". This will download a `.json` file containing your app's credentials.
 
+3. **Create a Service Account**
+    - In the "Authorization" tab, click on "Create Service Account".
+    - Follow the prompts to create the service account. This account will be used to authenticate your app.
+
+4. **Grant permissions to the service account**
+    - Grant the service account “AutomationUser_xxxxx@boxdevedition.com” editor permissions for the folder you want to use.
+    
 ## Commands
 
 ### `resutil init`
