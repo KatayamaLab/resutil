@@ -106,7 +106,7 @@ Resutil supports Google Cloud Storage, Google Drive, and Box for a cloud storage
     - Click on "Create Service Account."
     - Provide a name and description for the service account, and click "Create."
 5. **Grant Permissions to the Service Account**:
-    - Select the roles that grant the necessary permissions to the service account. For example, to access Cloud Storage, you might choose the "Storage Admin" role.
+    - Select the "Storage Object User" roles that grant the necessary permissions to the service account.
     - Click "Continue," and then "Done."
 6. **Create and Download a Key for the Service Account**:
     - Click on the service account you just created.
