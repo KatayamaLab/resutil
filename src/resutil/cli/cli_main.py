@@ -232,7 +232,7 @@ def command_init(args):
             print(f"  [red]{e}[/red]")
             return
 
-    # set box config
+    # set gcs config
     elif storage_type == "gcs":
         d = "key.json"
         print(f"Input key file_path [bold]({d})[/bold]: ", end="")
@@ -261,7 +261,7 @@ def command_init(args):
             print(f"  [red]{e}[/red]")
             return
 
-    # set box config
+    # set gdrive config
     elif storage_type == "gdrive":
         d = "key.json"
         print(f"Input key file_path [bold]({d})[/bold]: ", end="")
