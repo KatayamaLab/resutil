@@ -256,3 +256,8 @@ dependency: Dependencies (automatically extracted from directories in the comman
   - ex1
   - ex2
 ```
+
+## how to publish
+
+rye build --wheel
+rye publish
