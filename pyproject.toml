@@ -1,10 +1,8 @@
 [project]
 name = "resutil"
-version = "0.1.6"
+version = "0.1.7"
 description = "Resutil is a utility to manage experimental result data obtained from Python projects. It also manages dependency such as codes and input data with result data. Data is synced to the cloud for team sharing and collaboration."
-authors = [
-    { name = "nobkat", email = "katayama@rs.tus.ac.jp" }
-]
+authors = [{ name = "nobkat", email = "katayama@rs.tus.ac.jp" }]
 dependencies = [
     "pyyaml>=6.0.0",
     "rich>=13.7.0",
