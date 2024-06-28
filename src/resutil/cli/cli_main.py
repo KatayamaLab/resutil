@@ -13,7 +13,7 @@ from ..ex_dir import (
 )
 from ..utils import user_confirm, verify_comment
 from ..config_file import ConfigYaml, create_ex_yaml
-from ..storage import Box
+from ..storage import Box, GCS, GDrive
 
 from ..core import (
     initialize,
@@ -196,10 +196,10 @@ def command_init(args):
     # set storage type
     while True:
         d = "box"
-        print(f"Input storage_type [bold]({d})[/bold]: ", end="")
+        print(f"Input storage_type ([bold]box[/bold]/gcs/gdrive): ", end="")
         s = input()
         storage_type = s if s != "" else "box"
-        if storage_type in ["box"]:
+        if storage_type in ["box", "gcs", "gdrive"]:
             break
     config.set_storage_type(storage_type)
 
@@ -227,6 +227,64 @@ def command_init(args):
 
         try:
             Box(config.storage_config, config.project_name)
+        except Exception as e:
+            print("❌ Failed to connect to storage.")
+            print(f"  [red]{e}[/red]")
+            return
+
+    # set box config
+    elif storage_type == "gcs":
+        d = "key.json"
+        print(f"Input key file_path [bold]({d})[/bold]: ", end="")
+        s = input()
+        key_file_path = s if s != "" else "key.json"
+
+        yn = user_confirm(
+            f"Do you want to add {key_file_path} to .gitignore?", default="y"
+        )
+        if yn:
+            with open(".gitignore", "a") as f:
+                f.write("\n# Resutil config file\n")
+                f.write(key_file_path + "\n")
+
+        print(f"Input bucket name: ", end="")
+        backet_name = input()
+
+        storage_config = {"key_file_path": key_file_path, "backet_name": backet_name}
+
+        config.set_storage_config(storage_config)
+
+        try:
+            GCS(config.storage_config, config.project_name)
+        except Exception as e:
+            print("❌ Failed to connect to storage.")
+            print(f"  [red]{e}[/red]")
+            return
+
+    # set box config
+    elif storage_type == "gdrive":
+        d = "key.json"
+        print(f"Input key file_path [bold]({d})[/bold]: ", end="")
+        s = input()
+        key_file_path = s if s != "" else "key.json"
+
+        yn = user_confirm(
+            f"Do you want to add {key_file_path} to .gitignore?", default="y"
+        )
+        if yn:
+            with open(".gitignore", "a") as f:
+                f.write("\n# Resutil config file\n")
+                f.write(key_file_path + "\n")
+
+        print(f"Input folder id of base dir: ", end="")
+        base_dir_id = input()
+
+        storage_config = {"key_file_path": key_file_path, "base_folder_id": base_dir_id}
+
+        config.set_storage_config(storage_config)
+
+        try:
+            GDrive(config.storage_config, config.project_name)
         except Exception as e:
             print("❌ Failed to connect to storage.")
             print(f"  [red]{e}[/red]")

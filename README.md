@@ -86,6 +86,86 @@ if __name__ == "__main__":
     main_func()
 ```
 
+## How to setup cloud storage for Resutil
+
+Resutil supports Google Cloud Storage, Google Drive, and Box for a cloud storage to store result files. To connect these cloud services following setup will be required.
+
+### Google Cloud Storage
+
+1. **Create a Project**:
+    - If you don't already have a project, go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
+2. **Enable the Cloud Storage API**:
+    - Go to the [API Library](https://console.cloud.google.com/apis/library) in the Google Cloud Console.
+    - Search for "Cloud Storage" and enable the API for your project.
+3. **Create a Storage Bucket**:
+    - In the Google Cloud Console, go to the [Cloud Storage Browser](https://console.cloud.google.com/storage/browser).
+    - Click on "Create Bucket."
+    - Follow the prompts to name your bucket, select a storage class, and set the location for your bucket.
+4. **Create a Service Account**:
+    - In the Google Cloud Console, go to the [IAM & Admin](https://console.cloud.google.com/iam-admin/serviceaccounts) section.
+    - Click on "Create Service Account."
+    - Provide a name and description for the service account, and click "Create."
+5. **Grant Permissions to the Service Account**:
+    - Select the "Storage Object User" roles that grant the necessary permissions to the service account.
+    - Click "Continue," and then "Done."
+6. **Create and Download a Key for the Service Account**:
+    - Click on the service account you just created.
+    - Go to the "Keys" tab.
+    - Click "Add Key," then "Create New Key."
+    - Choose "JSON" as the key type, and click "Create." The key file will be downloaded to your computer.
+
+### Google Drive
+
+1. **Create a Folder in Google Drive**:
+    - Open [Google Drive](https://drive.google.com/).
+    - Click on "New" and select "Folder."
+    - Name the folder and click "Create."
+2. **Get the Folder ID**:
+    - Navigate to the folder you just created.
+    - The folder ID is the part of the URL after `folders/`. For example, in the URL `https://drive.google.com/drive/folders/1a2b3c4d5e6f`, the folder ID is `1a2b3c4d5e6f`.
+3. **Create a Service Account**:
+    - Go to the [Google Cloud Console](https://console.cloud.google.com/).
+    - Select your project or create a new one.
+    - Navigate to the [IAM & Admin](https://console.cloud.google.com/iam-admin/serviceaccounts) section.
+    - Click "Create Service Account."
+    - Provide a name and description for the service account, and click "Create."
+4. **Create and Download a Key for the Service Account**:
+    - Click on the service account you just created.
+    - Go to the "Keys" tab.
+    - Click "Add Key," then "Create New Key."
+    - Choose "JSON" as the key type, and click "Create." The key file will be downloaded to your computer.
+5. **Enable the Google Drive API**:
+    - Go to the [API Library](https://console.cloud.google.com/apis/library) in the Google Cloud Console.
+    - Search for "Google Drive API" and enable it for your project.
+6. **Share the Folder**:
+    - In Google Drive, right-click on the folder you created.
+    - Select "Share."
+    - In the "Share with people and groups" field, enter the email address of the service account (you can find this in the JSON key file under `client_email`).
+    - Give the service account `Editor` access.
+    - Click "Send."
+
+### Box
+
+Sure, I can guide you through the process of obtaining a JWT (JSON Web Token) from Box's developer console. Follow these steps:
+
+1. **Create a Box Application**
+    - Go to the [Box Developer Console](https://account.box.com/login) and log in with your Box account.
+    - Click on "Create New App".
+    - Give your app a name and click "Next".
+    - Choose "Custom App" and select "Server Authentication (with JWT)".
+
+2. **Configure Your Application**
+    - In your app's settings, go to the "Configuration" tab.
+    - Under "Application Scopes", choose two access levels, "Read/Write all files and folders stored in Box".
+    - Scroll down to the "Add and Manage Public Keys" section and click "Generate a Public/Private Keypair". This will download a `.json` file containing your app's credentials.
+
+3. **Create a Service Account**
+    - In the "Authorization" tab, click on "Create Service Account".
+    - Follow the prompts to create the service account. This account will be used to authenticate your app.
+
+4. **Grant permissions to the service account**
+    - Grant the service account “AutomationUser_xxxxx@boxdevedition.com” editor permissions for the folder you want to use.
+    
 ## Commands
 
 ### `resutil init`

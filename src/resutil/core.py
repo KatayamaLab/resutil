@@ -9,7 +9,7 @@ import shutil
 
 from rich import print
 
-from .storage import Box, GS
+from .storage import Box, GCS, GDrive
 from .config_file import ConfigYaml
 from .exp_file import ExpFile
 from .ex_dir import get_ex_dir_names
@@ -30,16 +30,23 @@ def initialize():
         storage = Box(config.storage_config, config.project_name)
         print("📦 Connected to [bold]box[/bold]")
         info = storage.get_info()
-        print(f"  📁 Base dir id: [bold]{info['base_folder_id']}[/bold]")
+        print(f"  📁 Base folder id: [bold]{info['base_folder_id']}[/bold]")
         print(f"  📁 Project folder name: [bold]{info['project_folder_name']}[/bold]")
         print(
             f"  📁 Project folder: [bold]https://app.box.com/folder/{info['project_folder_id']}[/bold]"
         )
-    elif config.storage_type == "gs":
-        storage = GS(config.storage_config, config.project_name)
+    elif config.storage_type == "gcs" or config.storage_type == "gs":
+        storage = GCS(config.storage_config, config.project_name)
         print("📦 Connected to [bold]Google Cloud Storage[/bold]")
         info = storage.get_info()
         print(f"  📁 Bucket name: [bold]{info['bucket_name']}[/bold]")
+        print(f"  📁 Project dir: [bold]{info['project_dir']}[/bold]")
+
+    elif config.storage_type == "gdrive":
+        storage = GDrive(config.storage_config, config.project_name)
+        print("📦 Connected to [bold]Google Drive[/bold]")
+        info = storage.get_info()
+        print(f"  📁 Base folder id: [bold]{info['base_folder_id']}[/bold]")
         print(f"  📁 Project dir: [bold]{info['project_dir']}[/bold]")
 
     else:
@@ -89,7 +96,7 @@ def recurcive_uploder(ex_name: str, results_dir: str, storage, executor):
 
 
 def upload_all(ex_names_to_upload: list[str], results_dir: str, storage: Box):
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         for ex_name in ex_names_to_upload:
             executor.submit(upload, ex_name, results_dir, storage)
 

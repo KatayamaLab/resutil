@@ -17,8 +17,7 @@
       "request": "launch",
       "module": "resutil.cli",
       "args": [
-        "pull",
-        "-A"
+        "push", "-A",
       ],
     }
   ]

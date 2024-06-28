@@ -1,4 +1,5 @@
 from .box.box import Box
-from .gs.gs import GS
+from .gcs.gcs import GCS
+from .gdrive.gdrive import GDrive
 
-__all__ = ["Box", "GS"]
+__all__ = ["Box", "GCS", "GDrive"]
