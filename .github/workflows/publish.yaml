@@ -38,8 +38,11 @@ jobs:
         path: dist/*
 
     - name: Deploy
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
       run: |
         rye add -d twine==5.1.1
-        rye run twine upload -r testpipy --repository-url https://test.pypi.org/legacy/ dist/* -u "__token__" -p ${{ secrets.PYPI_TOKEN }}
+        rye run twine upload -r testpipy --repository-url https://test.pypi.org/legacy/ dist/*
       # 以下はエラーがでるので、一時的に上のように変更。Ryeがtwine5.1.1を採用したら、以下に変更する
       # rye publish --yes --token ${{ secrets.PYPI_TOKEN }}
