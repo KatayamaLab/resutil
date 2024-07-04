@@ -298,3 +298,8 @@ dependency: Dependencies (automatically extracted from directories in the comman
   - ex1
   - ex2
 ```
+
+
+## デプロイ方法
+
+Add v*.*.* tag will automatically deploy to PyPI

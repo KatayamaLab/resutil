@@ -305,5 +305,4 @@ dependency: Dependencies (automatically extracted from directories in the comman
 
 ## how to publish
 
-rye build --wheel
-rye publish
+Add v*.*.* tag will automatically deploy to PyPI
