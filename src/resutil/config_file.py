@@ -1,35 +1,43 @@
-from os.path import join
+import os
 import sys
-from os.path import exists
+from pathlib import Path
 from typing import Optional
+
 
 import yaml
 
-from .utils import parse_result_dirs
+CONFIG_FILE_NAME = "resutil-conf.yaml"
 
 
-class ConfigYaml:
-    def __init__(self, config_file_path=None):
-        if config_file_path is None:
-            return
+class Config:
+    def __init__(self):
+        self.current_dir = Path.cwd()
 
+    def load(self):
+        # serch config file from current dir to root dir
+        for parent in [self.current_dir, *self.current_dir.parents]:
+            config_file_path = Path(parent, CONFIG_FILE_NAME)
+            if config_file_path.exists():
+                self.config_file_dir = parent
+                os.chdir(parent)
+                break
         try:
-            with open(config_file_path, "r") as f:
+            with config_file_path.open("r") as f:
                 conf = yaml.safe_load(f)
         except FileNotFoundError:
             raise FileNotFoundError(f"config file {config_file_path} does not exist.")
 
-        self.project_name = conf["project_name"]
-        self.results_dir = conf["results_dir"]
-        self.storage_type = conf["storage_type"]
-        self.storage_config = conf["storage_config"]
+        self.project_name: str = conf["project_name"]
+        self.results_dir: str = conf["results_dir"]
+        self.storage_type: str = conf["storage_type"]
+        self.storage_config: str = conf["storage_config"]
 
     def set_project_name(self, project_name: str):
         self.project_name = project_name
 
     def set_results_dir(self, results_dir: str):
         # check existence
-        if not exists(results_dir):
+        if not Path(results_dir).exists():
             raise ValueError(f"results_dir {results_dir} does not exist.")
         self.results_dir = results_dir
 
@@ -59,14 +67,14 @@ class ConfigYaml:
             raise ValueError("storage_type must be 'box'")
         self.storage_config = storage_config
 
-    def save(self, config_file_path):
+    def save(self):
         data = {
             "project_name": self.project_name,
             "results_dir": self.results_dir,
             "storage_type": self.storage_type,
             "storage_config": self.storage_config,
         }
-        with open(config_file_path, "w") as stream:
+        with open(CONFIG_FILE_NAME, "w") as stream:
             yaml.dump(data, stream)
 
 
@@ -86,5 +94,5 @@ def create_ex_yaml(
             "commit_hash": commit_hash,
         },
     }
-    with open(join(dir, "resutil-exp.yaml"), "w") as stream:
+    with Path(dir, "resutil-exp.yaml").open("w") as stream:
         yaml.dump(data, stream)

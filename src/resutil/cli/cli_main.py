@@ -12,7 +12,7 @@ from ..ex_dir import (
     change_comment,
 )
 from ..utils import user_confirm, verify_comment
-from ..config_file import ConfigYaml, create_ex_yaml
+from ..config_file import Config, create_ex_yaml
 from ..storage import Box, GCS, GDrive
 
 from ..core import (
@@ -162,7 +162,7 @@ def command_init(args):
             return
 
     # create config
-    config = ConfigYaml()
+    config = Config()
 
     # set project name (default is parent directory name)
     d = get_default_project_name()
@@ -291,7 +291,7 @@ def command_init(args):
             return
 
     # save config
-    config.save(config_file_path)
+    config.save()
 
     print("✅ Initialized.")
 

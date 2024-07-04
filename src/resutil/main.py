@@ -11,7 +11,7 @@ from prompt_toolkit.completion import WordCompleter
 from .utils import user_confirm, parse_result_dirs, verify_comment
 from .config_file import create_ex_yaml
 from .ex_dir import create_ex_dir, delete_ex_dir, find_unuploaded_ex_dirs
-from .git import find_git_repo, get_git_info, store_uncomited
+from .git import GitRepo
 
 from .core import initialize, upload, upload_all, get_past_comments
 
@@ -56,18 +56,15 @@ def main(verbose=True):
             ex_dir_path = join(config.results_dir, ex_name)
 
             # check uncommited files
-            git_repo = find_git_repo()
-            if git_repo is None:
-                commit_hash, unstaged_files = None, None
-            else:
-                commit_hash, unstaged_files = get_git_info(git_repo)
+            git_repo = GitRepo()
+
+            if git_repo.exist():
+                commit_hash, unstaged_files = git_repo.get_git_info()
                 if len(unstaged_files) > 0:
                     print("🔍 Unstaged files will be stored in the result dir:")
                     for file in unstaged_files:
                         print(f"  - {file}")
-                    store_uncomited(
-                        unstaged_files, join(ex_dir_path, "uncommited_files")
-                    )
+                    git_repo.store_uncomited_to(join(ex_dir_path, "uncommited_files"))
 
             dependency = parse_result_dirs(" ".join(sys.argv))
 
@@ -120,11 +117,10 @@ def main(verbose=True):
             ex_names_to_upload = find_unuploaded_ex_dirs(config.results_dir, storage)
 
             n = len(ex_names_to_upload)
-            if n > 0 and user_confirm(
-                f"ℹ️ There are {n} other experiment directory(s) that have not been uploaded. Do you want to upload them?",
-                default="y",
-            ):
-                upload_all(ex_names_to_upload, config.results_dir, storage)
+            if n > 0:
+                print(
+                    f"ℹ️ There are {n} other experiment directory(s) that have not been uploaded."
+                )
 
             print("✅ Done")
 
