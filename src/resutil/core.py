@@ -9,20 +9,20 @@ import shutil
 
 from rich import print
 
-from .storage import Box, GCS, GDrive
-from .config_file import ConfigYaml
+from .storage import Box, GCS, GDrive, Storage
+from .config_file import Config
 from .exp_file import ExpFile
 from .ex_dir import get_ex_dir_names
 
-config_file_name = "resutil-conf.yaml"
 exp_file_name = "resutil-exp.yaml"
 
 
 def initialize():
     try:
-        config = ConfigYaml(config_file_name)
+        config = Config()
+        config.load()
     except FileNotFoundError:
-        print(f"⚠️ Config file {config_file_name} does not exist.")
+        print(f"⚠️ Config file does not exist.")
         print("Create a config file by running [bold]resutil init[/bold] and try again")
         exit(1)
 
@@ -67,7 +67,7 @@ def zip_directory(folder_path, zip_path):
                 zipf.write(file_path, arcname)
 
 
-def upload(ex_name: str, results_dir: str, storage):
+def upload(ex_name: str, results_dir: str, storage: Storage):
     ex_dir_path = join(results_dir, ex_name)
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -77,7 +77,7 @@ def upload(ex_name: str, results_dir: str, storage):
         storage.upload_experiment(zip_path)
 
 
-def upload_with_dependency(ex_name: str, results_dir: str, storage):
+def upload_with_dependency(ex_name: str, results_dir: str, storage: Storage):
     with ThreadPoolExecutor(max_workers=10) as executor:
         recurcive_uploder(ex_name, results_dir, storage, executor)
 
@@ -95,7 +95,7 @@ def recurcive_uploder(ex_name: str, results_dir: str, storage, executor):
             recurcive_uploder(dependency, results_dir, storage, executor)
 
 
-def upload_all(ex_names_to_upload: list[str], results_dir: str, storage: Box):
+def upload_all(ex_names_to_upload: list[str], results_dir: str, storage: Storage):
     with ThreadPoolExecutor(max_workers=1) as executor:
         for ex_name in ex_names_to_upload:
             executor.submit(upload, ex_name, results_dir, storage)
@@ -106,7 +106,7 @@ def unzip_file(zip_path, extract_to):
         zip_ref.extractall(extract_to)
 
 
-def download(ex_name: str, results_dir: str, storage: Box):
+def download(ex_name: str, results_dir: str, storage: Storage):
     print(f"🗂️ Downloading: [bold]{ex_name}[/bold]")
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -116,12 +116,12 @@ def download(ex_name: str, results_dir: str, storage: Box):
         unzip_file(join(temp_dir, f"{ex_name}.zip"), ex_dir)
 
 
-def download_with_dependency(ex_name: str, results_dir: str, storage: Box):
+def download_with_dependency(ex_name: str, results_dir: str, storage: Storage):
     with ThreadPoolExecutor(max_workers=10) as executor:
         recurcive_downloader(ex_name, results_dir, storage, executor)
 
 
-def recurcive_downloader(ex_name: str, results_dir: str, storage: Box, executor):
+def recurcive_downloader(ex_name: str, results_dir: str, storage: Storage, executor):
     download(ex_name, results_dir, storage)
 
     ex_file_path = join(results_dir, ex_name, exp_file_name)
@@ -132,7 +132,7 @@ def recurcive_downloader(ex_name: str, results_dir: str, storage: Box, executor)
             executor.submit(recurcive_downloader, d, results_dir, storage, executor)
 
 
-def download_all(ex_names_to_download: list[str], results_dir: str, storage: Box):
+def download_all(ex_names_to_download: list[str], results_dir: str, storage: Storage):
     with ThreadPoolExecutor(max_workers=10) as executor:
         for ex_name in ex_names_to_download:
             executor.submit(download, ex_name, results_dir, storage)
@@ -148,7 +148,7 @@ def remove_local(ex_names: list[str], results_dir: str):
             print(f"⚠️ {ex_name} does not exist in the local directory.")
 
 
-def remove_remote(ex_names: list[str], storage):
+def remove_remote(ex_names: list[str], storage: Storage):
     ex_names_all = storage.get_all_experiment_names()
     for ex_name in ex_names:
         if ex_name in ex_names_all:
