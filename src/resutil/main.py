@@ -3,6 +3,7 @@ from datetime import datetime
 from os.path import join
 import sys
 import traceback
+import argparse
 
 from rich import print
 from prompt_toolkit import prompt
@@ -32,19 +33,37 @@ def main(verbose=True):
 
             config, storage = initialize()
 
-            comments = WordCompleter(get_past_comments(config.results_dir))
+            # parse arguments
+            parser = argparse.ArgumentParser("Resutil", add_help=False)
+            parser.add_argument("--resutil_comment", type=str)
+            parser.add_argument(
+                "--resutil_no_interactive",
+                action="store_true",
+            )
+            parsed_args, unknown = parser.parse_known_args(sys.argv[1:])
+            print(parsed_args)
 
-            print("")
-            while True:
-                comment = prompt(
-                    f"📝 Input comment for this experiment (press [tab] key to completion): ",
-                    completer=comments,
-                )
-                if verify_comment(comment):
-                    break
-                print(
-                    '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
-                )
+            # set interactive mode
+            no_interactive = parsed_args.resutil_no_interactive
+
+            # if --resutil_comment is not specified, ask for comment
+            if no_interactive and parsed_args.resutil_comment is None:
+                comment = ""
+            elif parsed_args.resutil_comment is not None:
+                comment = parsed_args.resutil_comment
+            else:
+                comments = WordCompleter(get_past_comments(config.results_dir))
+                print("")
+                while True:
+                    comment = prompt(
+                        f"📝 Input comment for this experiment (press [tab] key to completion): ",
+                        completer=comments,
+                    )
+                    if verify_comment(comment):
+                        break
+                    print(
+                        '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
+                    )
 
             print("")
 
@@ -77,6 +96,13 @@ def main(verbose=True):
 
             # Run the main function
             print("🚀 Running the main function...")
+
+            # if resutil is not interactive, run the function and upload the result
+            if no_interactive:
+                func(resutil_args(ex_dir_path), *args, **kwargs)
+                print("")
+                upload(ex_name, config.results_dir, storage)
+                return
 
             try:
                 func(resutil_args(ex_dir_path), *args, **kwargs)

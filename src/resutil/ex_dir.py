@@ -16,7 +16,10 @@ def create_ex_dir(now, comment, results_dir):
     elapsed_time = (now - base_time).total_seconds() / 60
     str26 = to_base26(int(elapsed_time))
 
-    ex_name = f"{str26}_{now_str}_{comment}"
+    if comment == "":
+        ex_name = f"{str26}_{now_str}"
+    else:
+        ex_name = f"{str26}_{now_str}_{comment}"
 
     ex_dir_path = os.path.join(results_dir, ex_name)
 
