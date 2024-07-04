@@ -25,6 +25,7 @@ from ..core import (
     download,
     remove_local,
     remove_remote,
+    get_ex_dir_names,
 )
 
 
@@ -380,9 +381,18 @@ def command_list(args):
     config, storage = initialize()
 
     print("📦 Remote experiment list")
-    ex_names = storage.get_all_experiment_names()
-    for ex_name in ex_names:
-        print(ex_name)
+
+    local_ex_names = get_ex_dir_names(config.results_dir)
+    remote_ex_names = storage.get_all_experiment_names()
+    all_ex_names = sorted(list(set(local_ex_names) | set(remote_ex_names)))
+
+    print("")
+    print("Remote | Local | Experiment name")
+    print("-------|-------|------------------------------")
+    for ex_name in all_ex_names:
+        remote = "✅" if ex_name in remote_ex_names else "  "
+        local = "✅" if ex_name in local_ex_names else "  "
+        print(f"   {remote}  |  {local}   | {ex_name}")
 
 
 def command_rm(args):
