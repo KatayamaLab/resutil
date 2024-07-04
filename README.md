@@ -86,6 +86,44 @@ if __name__ == "__main__":
     main_func()
 ```
 
+### Tips for Using argparse
+
+Resutil uses the options `--resutil_comment` and `--resutil_no_interactive`. If you use argparse in the main code where you want to integrate Resutil, these options will cause an error as undefined arguments. Please use `parse_known_args()` instead of `parse_args()` as shown below.
+
+```python
+    parser = argparse.ArgumentParser("Your code")
+    parser.add_argument("--arg1", type=str)
+    parser.add_argument("arg2", type=str, help="test input")
+    parsed_args, unknown = parser.parse_known_args()  # Use parse_known_args instead of parse_args
+```
+
+## Usage
+
+Run the program integrated with Resutil. You will first be prompted for a comment, and then an experiment result directory will be automatically created. This directory will include a name composed of a sequential alphabet, date, time, and your comment. The directory is then zipped and uploaded to the specified cloud storage after the program finishes.
+
+```bash
+$ python sample.py
+
+✨ Running your code with Resutil
+
+📦 Connected to Google Cloud Storage
+  📁 Bucket name: resutil
+  📁 Project dir: your_project
+
+📝 Input comment for this experiment (press [tab] key for completion): nice-comment
+
+🔍 Unstaged files will be stored in the result dir:
+  - README.ja.md
+  - README.md
+🚀 Running the main function...
+
+### Your code's output
+
+🗂️ Uploading: aapfup_20240704T191555_nice-comment
+ℹ️ There are 9 other experiment directories that have not been uploaded.
+✅ Done
+```
+
 ## How to setup cloud storage for Resutil
 
 Resutil supports Google Cloud Storage, Google Drive, and Box for a cloud storage to store result files. To connect these cloud services following setup will be required.
@@ -220,6 +258,14 @@ The `resutil rm` command removes experiments. You can use it as follows: resutil
 ### `resutil comment` **EXPERIMENTAL**
 
 `resutil comment [EXPERIMENT] [COMMENT]` add or modify a comment following timestamp in the experiment name. Both local and cloud experiment name will change if existing. It should be noted that Resutil regards a differnt experimental name as a different experiment, and this does not affect the name of the same experiment other users have already pull.
+
+## Runtime Arguments
+
+When running code that integrates Resutil, you can use the following two arguments:
+
+`--resutil_comment COMMENT` Specifies a comment required at the start of execution. This prevents the need to prompt for a comment during execution.
+
+`--resutil_no_interactive` Enables non-interactive mode. This prevents any user prompts during execution. This is useful when running as a batch job. If `--resutil_comment COMMENT` is not specified, no comment will be added to the experiment directory.
 
 ## Directory structure in the cloud storage
 

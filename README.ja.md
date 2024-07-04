@@ -84,6 +84,46 @@ if __name__ == "__main__":
     main_func()
 ```
 
+### argparseを用いるときの注意点
+
+Resutilでは`--reusitl_comment`と`--resutil_no_interactive`というオプションを用います。Resutilを組み込みたいメインコードでargparseを用いると、これらのオプションが定義されていない引数としてエラーが発生します。。以下のように`parse_arg()`の代わりに`parse_known_args()`を用いてください。
+
+```python
+    parser = argparse.ArgumentParser("Your code")
+    parser.add_argument("--arg1", type=str)
+    parser.add_argument("arg2", type=str, help="test input")
+    parsed_args, unknown = parser.parse_known_args()  # parse_argsの代わりにparse_known_argsを使う
+```
+
+## 使用方法
+
+Resutilを組み込んだプログラムを実行します。まずコメントを求められ、時系列順のアルファベット、日時、コメントを名前に含む実験結果保存用のディレクトリが自動的に作成されます。
+このディレクトリはzip圧縮され、プログラム終了後に指定されたクラウドストレージにアップロードされます。
+
+
+```bash
+$ python sample.py
+
+✨ Runnning your code with Resutil
+
+📦 Connected to Google Cloud Storage
+  📁 Bucket name: resutil
+  📁 Project dir: your_project
+
+📝 Input comment for this experiment (press [tab] key to completion): nice-comment
+
+🔍 Unstaged files will be stored in the result dir:
+  - README.ja.md
+  - README.md
+🚀 Running the main function...
+
+### Your code's output
+
+🗂️ Uploading: aapfup_20240704T191555_nice-comment
+ℹ️ There are 9 other experiment directory(s) that have not been uploaded.
+✅ Done
+```
+
 ## クラウドストレージ設定方法
 
 ResutilはGoogle Cloud Storage、Google Drive、およびBoxをサポートしています。これらのクラウドサービスに接続するには、以下の設定が必要です。
@@ -164,6 +204,7 @@ Boxの開発者コンソールからJWT（JSON Web Token）を取得する手順
 4. **サービスアカウントに権限を付与**
     - 使用したいフォルダに対して、サービスアカウント“AutomationUser_xxxxx@boxdevedition.com”に編集権限を与えます。
 
+
 ## コマンド
 
 ### `resutil init`
@@ -212,6 +253,15 @@ storage_config:
 ### `resutil comment` **実験的機能**
 
 `resutil comment [EXPERIMENT] [COMMENT]` は、タイムスタンプに続いて実験名にコメントを追加または変更します。既存の実験名が存在する場合、ローカルとクラウドの両方の実験名が変更されます。Resutil は異なる実験名を異なる実験として認識するため、これは他のユーザーが既にプルしている同じ実験の名前には影響しないことに注意してください。
+
+## 実行時の引数
+
+Resutilを組み込んだコードを実行する際には以下の２つの引数を取ることができます。
+
+`--reusitl_comment COMMENT` 実行開始時に求められるコメントを指定します。実行時にコメントを求められなくなります。
+
+`--resutil_no_interactive` 非インタラクティブモードにします。実行時にユーザーへ問い合わせをしなくなります。バッチジョブとして実行する場合に利用します。上記の`--reusitl_comment COMMENT`が指定されていない場合には実験ディレクトリにコメントは付与されません。
+
 
 ## クラウドストレージのディレクトリ構成
 

@@ -3,11 +3,17 @@ import resutil
 from os import makedirs
 from os.path import join
 from time import sleep
+import argparse
 
 
 @resutil.main()
 def main_func(params):
     print("----Results can be stored in ", params.ex_dir)
+
+    parser = argparse.ArgumentParser("sample")
+    parser.add_argument("--test_arg", type=str, help="test")
+    parser.add_argument("test_input", type=str, help="test input", default="")
+    parsed_args, unknown = parser.parse_known_args()
 
     with open(join(params.ex_dir, "test.txt"), "w") as f:
         f.write("Hello World")
