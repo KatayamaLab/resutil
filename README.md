@@ -1,4 +1,5 @@
 # Resutil
+Japanese readme is [here]([https://](https://github.com/KatayamaLab/resutil/blob/main/README.ja.md))
 
 ## What is Resutil
 
@@ -272,10 +273,10 @@ When running code that integrates Resutil, you can use the following two argumen
 ```plain text
 BaseDir    # Base directory specified base_dir_id
 ├──MyProj  # Project directory
-│   ├── aakuqj_20240511T174522_ex1  # Experiment directory
-│   │   ├── resutil-exp.yaml       # Experiment information
-│   │   └── data.txt               # Data (example)
-│   ├── aamxrp_20240606T135747_ex2
+│   ├── aakuqj_20240511T174522_ex1.zip  # zip file of Experiment directory
+│   │   ├── resutil-exp.yaml            # Experiment information
+│   │   └── data.txt                    # Data (example)
+│   ├── aamxrp_20240606T135747_ex2.zip
 │   │   ├── resutil-exp.yaml
 │   │   ├── data.txt
 │   │   └── uncommited_files       # Uncommitted files
