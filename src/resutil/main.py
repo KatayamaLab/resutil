@@ -41,7 +41,6 @@ def main(verbose=True):
                 action="store_true",
             )
             parsed_args, unknown = parser.parse_known_args(sys.argv[1:])
-            print(parsed_args)
 
             # set interactive mode
             no_interactive = parsed_args.resutil_no_interactive

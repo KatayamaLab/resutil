@@ -387,12 +387,12 @@ def command_list(args):
     all_ex_names = sorted(list(set(local_ex_names) | set(remote_ex_names)))
 
     print("")
-    print("Remote | Local | Experiment name")
+    print(" Local |Remote | Experiment name")
     print("-------|-------|------------------------------")
     for ex_name in all_ex_names:
         remote = "✅" if ex_name in remote_ex_names else "  "
         local = "✅" if ex_name in local_ex_names else "  "
-        print(f"   {remote}  |  {local}   | {ex_name}")
+        print(f"   {local}  |  {remote}   | {ex_name}")
 
 
 def command_rm(args):
