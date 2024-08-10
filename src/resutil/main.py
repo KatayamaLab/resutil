@@ -118,14 +118,14 @@ def main(verbose=True):
             if no_interactive:
                 func(resutil_args(ex_dir_path), *args, **kwargs)
                 print("")
-                if not (no_remote and debug_mode):
+                if not (no_remote or debug_mode):
                     upload(ex_name, config.results_dir, storage)
                 return
 
             try:
                 func(resutil_args(ex_dir_path), *args, **kwargs)
                 print("")
-                if not (no_remote and debug_mode):
+                if not (no_remote or debug_mode):
                     upload(ex_name, config.results_dir, storage)
 
             except KeyboardInterrupt:
