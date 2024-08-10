@@ -268,6 +268,10 @@ When running code that integrates Resutil, you can use the following two argumen
 
 `--resutil_no_interactive` Enables non-interactive mode. This prevents any user prompts during execution. This is useful when running as a batch job. If `--resutil_comment COMMENT` is not specified, no comment will be added to the experiment directory.
 
+`--resutil_debug` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be unloaded to the cloud storage.
+
+`--resutil_no_remote` Restrains from uploading results to the cloud storage
+
 ## Directory structure in the cloud storage
 
 ```plain text
