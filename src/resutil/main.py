@@ -56,7 +56,7 @@ def main(verbose=True):
             no_remote = parsed_args.resutil_no_remote
 
             # if --resutil_comment is not specified, ask for comment
-            if no_interactive and parsed_args.resutil_comment is None:
+            if (no_interactive and parsed_args.resutil_comment is None) or debug_mode:
                 comment = ""
             elif parsed_args.resutil_comment is not None:
                 comment = parsed_args.resutil_comment
@@ -98,6 +98,9 @@ def main(verbose=True):
                     for file in unstaged_files:
                         print(f"  - {file}")
                     git_repo.store_uncomited_to(join(ex_dir_path, "uncommited_files"))
+            else:
+                commit_hash = None
+                unstaged_files = []
 
             dependency = parse_result_dirs(" ".join(sys.argv))
 
