@@ -307,7 +307,7 @@ def command_push(args):
             upload_with_dependency(args.experiment, config.results_dir, storage)
         print("✅ Uploaded")
 
-    elif args.all:
+    elif args.all or args.experiment is None:
         ex_names_to_upload = find_unuploaded_ex_dirs(config.results_dir, storage)
 
         n = len(ex_names_to_upload)
@@ -325,7 +325,7 @@ def command_push(args):
 def command_pull(args):
     config, storage = initialize()
 
-    if args.experiment:
+    if args.experiment or args.experiment is None:
         if args.no_dependency:
             download(args.experiment, config.results_dir, storage)
         else:
