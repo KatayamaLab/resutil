@@ -40,13 +40,23 @@ def main(verbose=True):
                 "--resutil_no_interactive",
                 action="store_true",
             )
+            parser.add_argument(
+                "--resutil_debug",
+                action="store_true",
+            )
+            parser.add_argument(
+                "--resutil_no_remote",
+                action="store_true",
+            )
             parsed_args, unknown = parser.parse_known_args(sys.argv[1:])
 
             # set interactive mode
             no_interactive = parsed_args.resutil_no_interactive
+            debug_mode = parsed_args.resutil_debug
+            no_remote = parsed_args.resutil_no_remote
 
             # if --resutil_comment is not specified, ask for comment
-            if no_interactive and parsed_args.resutil_comment is None:
+            if (no_interactive and parsed_args.resutil_comment is None) or debug_mode:
                 comment = ""
             elif parsed_args.resutil_comment is not None:
                 comment = parsed_args.resutil_comment
@@ -66,11 +76,16 @@ def main(verbose=True):
 
             print("")
 
-            ex_name = create_ex_dir(
-                datetime.now(),
-                comment,
-                config.results_dir,
-            )
+            if debug_mode:
+                print("🔍 Debug mode is enabled.")
+                print("")
+                ex_name = "_debug"
+            else:
+                ex_name = create_ex_dir(
+                    datetime.now(),
+                    comment,
+                    config.results_dir,
+                )
             ex_dir_path = join(config.results_dir, ex_name)
 
             # check uncommited files
@@ -83,6 +98,9 @@ def main(verbose=True):
                     for file in unstaged_files:
                         print(f"  - {file}")
                     git_repo.store_uncomited_to(join(ex_dir_path, "uncommited_files"))
+            else:
+                commit_hash = None
+                unstaged_files = []
 
             dependency = parse_result_dirs(" ".join(sys.argv))
 
@@ -100,13 +118,15 @@ def main(verbose=True):
             if no_interactive:
                 func(resutil_args(ex_dir_path), *args, **kwargs)
                 print("")
-                upload(ex_name, config.results_dir, storage)
+                if not (no_remote or debug_mode):
+                    upload(ex_name, config.results_dir, storage)
                 return
 
             try:
                 func(resutil_args(ex_dir_path), *args, **kwargs)
                 print("")
-                upload(ex_name, config.results_dir, storage)
+                if not (no_remote or debug_mode):
+                    upload(ex_name, config.results_dir, storage)
 
             except KeyboardInterrupt:
                 print("")

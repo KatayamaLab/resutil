@@ -226,7 +226,7 @@ The `resutil push` command is used to upload experimental data to the cloud that
 
 `resutil push [exp_name]` uploads experiment a specific directory to the cloud. Depending directorys included in `exp-config.yaml` are automtically uploaded. `--no-dependency` option restrain automatic dependency upload.
 
-`resutil pull --all` will upload all experimental data to the cloud.
+`resutil pull` will upload all experimental data to the cloud.
 
 This is useful for keeping your local data up-to-date with the data stored in the cloud, especially when multiple people are working on the same project and updating the experimental data.
 
@@ -236,7 +236,7 @@ The `resutil pull` command is used to download a specific experimental data from
 
 `resutil pull [exp_name]` downloads experiment directory from cloud. Depending directorys included in `exp-config.yaml` are automtically downlowded. `--no-dependency` option restrain automatic dependency download.
 
-`resutil pull --all` will download all experimental data from the cloud that is not currently in your local result directory.
+`resutil pull` will download all experimental data from the cloud that is not currently in your local result directory.
 
 This is useful for keeping your local data up-to-date with the data stored in the cloud, especially when multiple people are working on the same project and updating the experimental data.
 
@@ -267,6 +267,10 @@ When running code that integrates Resutil, you can use the following two argumen
 `--resutil_comment COMMENT` Specifies a comment required at the start of execution. This prevents the need to prompt for a comment during execution.
 
 `--resutil_no_interactive` Enables non-interactive mode. This prevents any user prompts during execution. This is useful when running as a batch job. If `--resutil_comment COMMENT` is not specified, no comment will be added to the experiment directory.
+
+`--resutil_debug` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be unloaded to the cloud storage.
+
+`--resutil_no_remote` Restrains from uploading results to the cloud storage
 
 ## Directory structure in the cloud storage
 

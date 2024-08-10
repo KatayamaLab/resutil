@@ -9,7 +9,6 @@ from .utils import to_base26, parse_result_dirs
 
 
 def create_ex_dir(now, comment, results_dir):
-
     base_time = datetime(2024, 1, 1, 0, 0, 0, 0)
     now_str = now.strftime("%Y%m%dT%H%M%S")
 
@@ -44,7 +43,9 @@ def change_comment(results_dir, ex_name, new_comment):
 
 def get_ex_dir_names(results_dir):
     ex_dir_paths = glob(join(results_dir + "/*/"))
-    ex_dir_names = [basename(normpath(p)) for p in ex_dir_paths]
+    ex_dir_names = [
+        basename(normpath(p)) for p in ex_dir_paths if basename(normpath(p)) != "_debug"
+    ]
     return ex_dir_names
 
 
