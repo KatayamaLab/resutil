@@ -226,7 +226,7 @@ The `resutil push` command is used to upload experimental data to the cloud that
 
 `resutil push [exp_name]` uploads experiment a specific directory to the cloud. Depending directorys included in `exp-config.yaml` are automtically uploaded. `--no-dependency` option restrain automatic dependency upload.
 
-`resutil pull --all` will upload all experimental data to the cloud.
+`resutil pull` will upload all experimental data to the cloud.
 
 This is useful for keeping your local data up-to-date with the data stored in the cloud, especially when multiple people are working on the same project and updating the experimental data.
 
@@ -236,7 +236,7 @@ The `resutil pull` command is used to download a specific experimental data from
 
 `resutil pull [exp_name]` downloads experiment directory from cloud. Depending directorys included in `exp-config.yaml` are automtically downlowded. `--no-dependency` option restrain automatic dependency download.
 
-`resutil pull --all` will download all experimental data from the cloud that is not currently in your local result directory.
+`resutil pull` will download all experimental data from the cloud that is not currently in your local result directory.
 
 This is useful for keeping your local data up-to-date with the data stored in the cloud, especially when multiple people are working on the same project and updating the experimental data.
 
