@@ -4,6 +4,7 @@ from os.path import join
 import sys
 import traceback
 import argparse
+import os
 
 from rich import print
 from prompt_toolkit import prompt
@@ -80,6 +81,7 @@ def main(verbose=True):
                 print("🔍 Debug mode is enabled.")
                 print("")
                 ex_name = "_debug"
+                os.makedirs(join(config.results_dir, ex_name), exist_ok=True)
             else:
                 ex_name = create_ex_dir(
                     datetime.now(),
