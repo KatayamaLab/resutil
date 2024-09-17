@@ -17,7 +17,7 @@ dependencies = [
     "google-auth-oauthlib>=1.2.0",
 ]
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">= 3.11"
 license = { file = "LICENSE" }
 
 [build-system]
