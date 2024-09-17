@@ -80,7 +80,7 @@ class Config:
 
 def create_ex_yaml(
     dir: str,
-    dependency: list[str] = [],
+    dependencies: list[Path] = [],
     commit_hash: Optional[str] = None,
     uncommited_files: list[str] = [],
 ):
@@ -88,11 +88,11 @@ def create_ex_yaml(
     data = {
         "args": args,
         "result_dir": dir,
-        "dependency": dependency,
+        "dependency": [str(dependency) for dependency in dependencies],
         "git": {
             "uncommited_files": uncommited_files,
             "commit_hash": commit_hash,
         },
     }
     with Path(dir, "resutil-exp.yaml").open("w") as stream:
-        yaml.dump(data, stream)
+        yaml.dump(data, stream, width=10000, allow_unicode=True)
