@@ -22,6 +22,7 @@ Japanese readme is [here]([https://](https://github.com/KatayamaLab/resutil/blob
 - Uncommitted files
 - Upload experimental data that hasn’t been uploaded yet.
 - Download experimental data from the cloud using commands.
+- Automatically download dependencies that do not existing at run time.
 
 ## Installation
 
