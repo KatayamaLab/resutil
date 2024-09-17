@@ -27,11 +27,7 @@ def parse_result_dirs(argv: list[str], results_dir: str) -> list[Path]:
     result_dirs = []
     for arg in argv:
         path = Path(arg).resolve()
-        if (
-            path.is_dir()
-            and path.is_relative_to(results_path)
-            and re.match(pattern, str(path.name))
-        ):
+        if path.is_relative_to(results_path) and re.match(pattern, str(path.name)):
             result_dirs.append(path.relative_to(current_dir))
 
     return result_dirs

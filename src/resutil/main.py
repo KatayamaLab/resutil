@@ -123,9 +123,9 @@ def main(verbose=True):
             # Check all dependencies exist
             unexisting_deps = []
             for dep in dependencies:
-                dep_path = Path(dep)
-                if not dep_path.exists() or not dep_path.is_dir():
-                    unexisting_deps.append(dep_path)
+                print(dep)
+                if not dep.exists():
+                    unexisting_deps.append(dep)
             if len(unexisting_deps) > 0:
                 print(
                     "🔍 The following dependencies do not exist. They will be downloaded."
