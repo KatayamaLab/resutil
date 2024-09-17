@@ -21,8 +21,17 @@ class GitRepo:
 
         # Get modified files
 
-        modified_files = [item.a_path for item in self.repo.index.diff(None)]
-        staged_files = [item.a_path for item in self.repo.index.diff("HEAD")]
+        modified_files = [
+            item.a_path
+            for item in self.repo.index.diff(None)
+            if not item.change_type == "D"
+        ]
+        staged_files = [
+            item.a_path
+            for item in self.repo.index.diff("HEAD")
+            if not item.change_type == "A"
+        ]
+
         self.uncommitd_file_path_list = [*modified_files, *staged_files]
 
         return latest_commit, self.uncommitd_file_path_list
