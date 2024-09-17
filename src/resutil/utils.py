@@ -1,6 +1,7 @@
 import re
 from rich import print
 import readline
+from pathlib import Path
 
 
 def to_base26(n):
@@ -18,10 +19,22 @@ def to_base26(n):
     return converted
 
 
-def parse_result_dirs(text: str):
+def parse_result_dirs(argv: list[str], results_dir: str) -> list[Path]:
     pattern = r"[a-zA-Z]{6}_\d{8}T\d{6}_[^/\s\\]*"
-    matches = re.findall(pattern, text)
-    return matches
+    results_path = Path(results_dir).resolve()
+    current_dir = Path.cwd()
+
+    result_dirs = []
+    for arg in argv:
+        path = Path(arg).resolve()
+        if (
+            path.is_dir()
+            and path.is_relative_to(results_path)
+            and re.match(pattern, str(path.name))
+        ):
+            result_dirs.append(path.relative_to(current_dir))
+
+    return result_dirs
 
 
 def user_confirm(question: str, default="") -> bool:

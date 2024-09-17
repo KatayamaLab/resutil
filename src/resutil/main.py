@@ -5,6 +5,7 @@ import sys
 import traceback
 import argparse
 import os
+from pathlib import Path
 
 from rich import print
 from prompt_toolkit import prompt
@@ -15,7 +16,13 @@ from .config_file import create_ex_yaml
 from .ex_dir import create_ex_dir, delete_ex_dir, find_unuploaded_ex_dirs
 from .git import GitRepo
 
-from .core import initialize, upload, upload_all, get_past_comments
+from .core import (
+    initialize,
+    upload,
+    upload_all,
+    get_past_comments,
+    download,
+)
 
 
 class resutil_args:
@@ -104,14 +111,31 @@ def main(verbose=True):
                 commit_hash = None
                 unstaged_files = []
 
-            dependency = parse_result_dirs(" ".join(sys.argv))
+            dependencies = parse_result_dirs(sys.argv, config.results_dir)
 
             create_ex_yaml(
                 ex_dir_path,
-                dependency,
+                dependencies,
                 commit_hash=commit_hash,
                 uncommited_files=unstaged_files,
             )
+
+            # Check all dependencies exist
+            unexisting_deps = []
+            for dep in dependencies:
+                dep_path = Path(dep)
+                if not dep_path.exists() or not dep_path.is_dir():
+                    unexisting_deps.append(dep_path)
+            if len(unexisting_deps) > 0:
+                print(
+                    "🔍 The following dependencies do not exist. They will be downloaded."
+                )
+                for dep in unexisting_deps:
+                    print(f"  📁 {dep}")
+                for dep in unexisting_deps:
+                    ex_name = dep.name
+                    download(ex_name, config.results_dir, storage)
+                print("")
 
             # Run the main function
             print("🚀 Running the main function...")
