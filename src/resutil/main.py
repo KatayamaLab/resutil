@@ -133,8 +133,7 @@ def main(verbose=True):
                 for dep in unexisting_deps:
                     print(f"  📁 {dep}")
                 for dep in unexisting_deps:
-                    ex_name = dep.name
-                    download(ex_name, config.results_dir, storage)
+                    download(dep.name, config.results_dir, storage)
                 print("")
 
             # Run the main function
