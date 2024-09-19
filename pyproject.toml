@@ -1,6 +1,6 @@
 [project]
 name = "resutil"
-version = "0.1.12"
+version = "0.1.12.1"
 description = "Resutil is a utility to manage experimental result data obtained from Python projects. It also manages dependency such as codes and input data with result data. Data is synced to the cloud for team sharing and collaboration."
 authors = [{ name = "nobkat", email = "katayama@rs.tus.ac.jp" }]
 dependencies = [
@@ -17,7 +17,7 @@ dependencies = [
     "google-auth-oauthlib>=1.2.0",
 ]
 readme = "README.md"
-requires-python = ">= 3.11"
+requires-python = ">= 3.8"
 license = { file = "LICENSE" }
 
 [build-system]
