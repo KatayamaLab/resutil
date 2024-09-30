@@ -313,8 +313,9 @@ dependency: Dependencies (automatically extracted from directories in the comman
 ## how to publish
 
 1. Change version number of `pyproject.toml`
-1. Add v*.*.* tag will automatically deploy to PyPI
-2. Add a [release note](https://github.com/KatayamaLab/resutil/releases) to GitHub such as:
+2. merge branch to `main`
+3. Add v*.*.* tag will automatically deploy to PyPI
+4. Add a [release note](https://github.com/KatayamaLab/resutil/releases) to GitHub such as:
     ```
     ## New Features
     - Add `--resutil_debug` and `--resutil_no_remote` options for trial-and-error phase
