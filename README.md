@@ -261,17 +261,18 @@ The `resutil rm` command removes experiments. You can use it as follows: resutil
 
 `resutil comment [EXPERIMENT] [COMMENT]` add or modify a comment following timestamp in the experiment name. Both local and cloud experiment name will change if existing. It should be noted that Resutil regards a differnt experimental name as a different experiment, and this does not affect the name of the same experiment other users have already pull.
 
-## Runtime Arguments
 
-When running code that integrates Resutil, you can use the following two arguments:
+## Environment Valuable
 
-`--resutil_comment COMMENT` Specifies a comment required at the start of execution. This prevents the need to prompt for a comment during execution.
+When running code that integrates Resutil, you can use the following environment valuables:
 
-`--resutil_no_interactive` Enables non-interactive mode. This prevents any user prompts during execution. This is useful when running as a batch job. If `--resutil_comment COMMENT` is not specified, no comment will be added to the experiment directory.
+`RESUTIL_COMMENT` Specifies a comment required at the start of execution. This prevents the need to prompt for a comment during execution.
 
-`--resutil_debug` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be unloaded to the cloud storage.
+`RESUTIL_NO_INTERACTIVE` Enables non-interactive mode. This prevents any user prompts during execution. This is useful when running as a batch job. If `RESUTIL_COMMENT` is not specified, no comment will be added to the experiment directory.
 
-`--resutil_no_remote` Restrains from uploading results to the cloud storage
+`RESUTIIL_REMOTE` Restrains from uploading results to the cloud storage.
+
+`RESUTIL_DEBUG` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be unloaded to the cloud storage.
 
 ## Directory structure in the cloud storage
 
