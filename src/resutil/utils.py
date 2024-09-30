@@ -2,6 +2,8 @@ import re
 from rich import print
 import readline
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Optional
 
 
 def to_base26(n):
@@ -71,3 +73,11 @@ def input_with_default(prompt, default=""):
         return input("")
     finally:
         readline.set_pre_input_hook()
+
+
+@dataclass
+class EnvArgs:
+    comment_env: Optional[str]
+    no_interactive: bool
+    no_remote: bool
+    debug_mode: bool

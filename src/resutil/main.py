@@ -11,7 +11,7 @@ from rich import print
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 
-from .utils import user_confirm, parse_result_dirs, verify_comment
+from .utils import user_confirm, parse_result_dirs, verify_comment, EnvArgs
 from .config_file import create_ex_yaml
 from .ex_dir import create_ex_dir, delete_ex_dir, find_unuploaded_ex_dirs
 from .git import GitRepo
@@ -30,6 +30,50 @@ class resutil_args:
         self.ex_dir = ex_dir
 
 
+def get_comment(env_args, config):
+    if env_args.debug_mode:
+        comment = ""
+    elif env_args.no_interactive:
+        if env_args.comment_env is not None:
+            comment = env_args.comment_env
+        else:
+            comment = ""
+    elif env_args.comment_env is not None:
+        comment = env_args.comment_env
+    else:
+        comments = WordCompleter(get_past_comments(config.results_dir))
+        print("")
+        while True:
+            comment = prompt(
+                f"📝 Input comment for this experiment (press [tab] key to completion): ",
+                completer=comments,
+            )
+            if verify_comment(comment):
+                break
+            print(
+                '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
+            )
+    print("")
+
+    return comment
+
+
+def get_env_args():
+    # set interactive mode
+    no_interactive = os.environ.get("RESUTIL_NO_INTERACTIVE") is not None
+    comment_env = os.environ.get("RESUTIL_COMMENT", None)
+    no_remote = os.environ.get("RESUTIL_NO_REMOTE") is not None
+    debug_mode = os.environ.get("RESUTIL_DEBUG") is not None
+    env_args = EnvArgs(
+        comment_env=comment_env,
+        no_interactive=no_interactive,
+        no_remote=no_remote,
+        debug_mode=debug_mode,
+    )
+
+    return env_args
+
+
 # Used as a decorator
 def main(verbose=True):
     def main_wrapper(func):
@@ -40,51 +84,11 @@ def main(verbose=True):
             print("")
 
             config, storage = initialize()
+            env_args = get_env_args()
 
-            # parse arguments
-            parser = argparse.ArgumentParser("Resutil", add_help=False)
-            parser.add_argument("--resutil_comment", type=str)
-            parser.add_argument(
-                "--resutil_no_interactive",
-                action="store_true",
-            )
-            parser.add_argument(
-                "--resutil_debug",
-                action="store_true",
-            )
-            parser.add_argument(
-                "--resutil_no_remote",
-                action="store_true",
-            )
-            parsed_args, unknown = parser.parse_known_args(sys.argv[1:])
+            comment = get_comment(env_args, config)
 
-            # set interactive mode
-            no_interactive = parsed_args.resutil_no_interactive
-            debug_mode = parsed_args.resutil_debug
-            no_remote = parsed_args.resutil_no_remote
-
-            # if --resutil_comment is not specified, ask for comment
-            if (no_interactive and parsed_args.resutil_comment is None) or debug_mode:
-                comment = ""
-            elif parsed_args.resutil_comment is not None:
-                comment = parsed_args.resutil_comment
-            else:
-                comments = WordCompleter(get_past_comments(config.results_dir))
-                print("")
-                while True:
-                    comment = prompt(
-                        f"📝 Input comment for this experiment (press [tab] key to completion): ",
-                        completer=comments,
-                    )
-                    if verify_comment(comment):
-                        break
-                    print(
-                        '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
-                    )
-
-            print("")
-
-            if debug_mode:
+            if env_args.debug_mode:
                 print("🔍 Debug mode is enabled.")
                 print("")
                 ex_name = "_debug"
@@ -139,20 +143,20 @@ def main(verbose=True):
             # Run the main function
             print("🚀 Running the main function...")
 
-            # if resutil is not interactive, run the function and upload the result
-            if no_interactive:
+            # if resutil is NOT interactive, run the function and upload the result
+            if env_args.no_interactive:
                 func(resutil_args(ex_dir_path), *args, **kwargs)
                 print("")
-                if not (no_remote or debug_mode):
+                if not (env_args.no_remote or env_args.debug_mode):
                     upload(ex_name, config.results_dir, storage)
                 return
 
+            # if resutil is interactive, ask the user to confirm before running the function
             try:
                 func(resutil_args(ex_dir_path), *args, **kwargs)
                 print("")
-                if not (no_remote or debug_mode):
+                if not (env_args.no_remote or env_args.debug_mode):
                     upload(ex_name, config.results_dir, storage)
-
             except KeyboardInterrupt:
                 print("")
                 if user_confirm(
