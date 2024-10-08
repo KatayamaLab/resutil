@@ -70,8 +70,6 @@ def find_undownloaded_ex_dirs(results_dir_path, storage):
 
 
 def delete_ex_dir(ex_dir_path):
-    if parse_result_dirs(ex_dir_path) == []:
-        raise ValueError(f"{ex_dir_path} does not exist")
     if os.path.exists(ex_dir_path):
         shutil.rmtree(ex_dir_path)
     return True
