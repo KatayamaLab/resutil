@@ -22,7 +22,7 @@ def to_base26(n):
 
 
 def parse_result_dirs(argv: list[str], results_dir: str) -> list[Path]:
-    pattern = r"[a-zA-Z]{6}_\d{8}T\d{6}_[^/\s\\]*"
+    pattern = r"[a-zA-Z]{6}_\d{8}T\d{6}[^/\s\\]*"
     results_path = Path(results_dir).resolve()
     current_dir = Path.cwd()
 
