@@ -22,15 +22,18 @@ def to_base26(n):
 
 
 def parse_result_dirs(argv: list[str], results_dir: str) -> list[Path]:
-    pattern = r"[a-zA-Z]{6}_\d{8}T\d{6}[^/\s\\]*"
+    pattern = r"[a-zA-Z]{6}_\d{8}T\d{6}[^/]*"
     results_path = Path(results_dir).resolve()
-    current_dir = Path.cwd()
 
     result_dirs = []
     for arg in argv:
         path = Path(arg).resolve()
-        if path.is_relative_to(results_path) and re.match(pattern, str(path.name)):
-            result_dirs.append(path.relative_to(current_dir))
+        ex_names = re.findall(pattern, path.as_posix())
+        if len(ex_names) == 0:
+            continue
+        if not path.is_relative_to(results_path):
+            continue
+        result_dirs.append(Path(results_dir, ex_names[0]))
 
     return result_dirs
 
