@@ -134,6 +134,9 @@ class GDrive(Storage):
         except Exception as e:
             print(f"An error occurred: {e}")
 
+    def exist_experiment(self, ex_name: str) -> bool:
+        return ex_name in self.get_all_experiment_names()
+
     def _find_file_id(self, file_name):
         if self.experiment_item_cache is None:
             self.get_all_experiment_names()

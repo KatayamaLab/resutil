@@ -67,3 +67,6 @@ class GCS(Storage):
             old_blob, self.client.bucket(self.bucket_name), new_name
         )
         old_blob.delete()
+
+    def exist_experiment(self, ex_name: str) -> bool:
+        return ex_name in self.get_all_experiment_names()

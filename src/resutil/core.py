@@ -92,7 +92,8 @@ def recurcive_uploder(ex_name: str, results_dir: str, storage, executor):
     if exists(ex_file_path):
         exp_file = ExpFile(ex_file_path)
         for dependency in exp_file.dependency:
-            recurcive_uploder(dependency, results_dir, storage, executor)
+            if not storage.exist_experiment(dependency):
+                recurcive_uploder(dependency, results_dir, storage, executor)
 
 
 def upload_all(ex_names_to_upload: list[str], results_dir: str, storage: Storage):
@@ -129,7 +130,8 @@ def recurcive_downloader(ex_name: str, results_dir: str, storage: Storage, execu
     if exists(ex_file_path):
         exp_file = ExpFile(ex_file_path)
         for d in exp_file.dependency:
-            executor.submit(recurcive_downloader, d, results_dir, storage, executor)
+            if not exists(join(results_dir, d)):
+                executor.submit(recurcive_downloader, d, results_dir, storage, executor)
 
 
 def download_all(ex_names_to_download: list[str], results_dir: str, storage: Storage):

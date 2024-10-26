@@ -47,11 +47,10 @@ def main():
         action="store_true",
         help="pull experiments without dependencies",
     )
-    group_pull = parser_pull.add_mutually_exclusive_group(required=True)
-    group_pull.add_argument(
+    parser_pull.add_argument(
         "-A", "--all", action="store_true", help="pull all experiments"
     )
-    group_pull.add_argument("experiment", nargs="?", help="experiment to pull")
+    parser_pull.add_argument("experiments", nargs="*", help="experiment(s) to pull")
     parser_pull.set_defaults(handler=command_pull)
 
     # push
@@ -61,11 +60,10 @@ def main():
         action="store_true",
         help="push experiments without dependencies",
     )
-    group_push = parser_push.add_mutually_exclusive_group(required=True)
-    group_push.add_argument(
+    parser_push.add_argument(
         "-A", "--all", action="store_true", help="push all experiments"
     )
-    group_push.add_argument("experiment", nargs="?", help="experient to push")
+    parser_push.add_argument("experiments", nargs="*", help="experient(s) to push")
     parser_push.set_defaults(handler=command_push)
 
     # add
@@ -300,14 +298,15 @@ def command_init(args):
 def command_push(args):
     config, storage = initialize()
 
-    if args.experiment:
-        if args.no_dependency:
-            upload(args.experiment, config.results_dir, storage)
-        else:
-            upload_with_dependency(args.experiment, config.results_dir, storage)
-        print("✅ Uploaded")
+    if args.experiments:
+        for ex_name in args.experiments:
+            if args.no_dependency:
+                upload(ex_name, config.results_dir, storage)
+            else:
+                upload_with_dependency(ex_name, config.results_dir, storage)
+            print("✅ Uploaded")
 
-    elif args.all or args.experiment is None:
+    elif args.all:
         ex_names_to_upload = find_unuploaded_ex_dirs(config.results_dir, storage)
 
         n = len(ex_names_to_upload)
@@ -320,20 +319,22 @@ def command_push(args):
 
         elif n == 0:
             print("✅ No experiment to upload.")
+    else:
+        print("⚠️ Specify experiment name(s) or use -A option.")
 
 
 def command_pull(args):
     config, storage = initialize()
 
-    if args.experiment or args.experiment is None:
-        if args.no_dependency:
-            download(args.experiment, config.results_dir, storage)
-        else:
-            download_with_dependency(args.experiment, config.results_dir, storage)
+    if args.experiments or args.experiments is None:
+        for ex_name in args.experiments:
+            if args.no_dependency:
+                download(ex_name, config.results_dir, storage)
+            else:
+                download_with_dependency(ex_name, config.results_dir, storage)
 
-        print(args.experiment)
+        print(args.experiments)
         print("✅ Downloaded")
-
     elif args.all:
         ex_names_to_upload = find_undownloaded_ex_dirs(config.results_dir, storage)
 
@@ -347,6 +348,8 @@ def command_pull(args):
 
         elif n == 0:
             print("✅ No experiment to download.")
+    else:
+        print("⚠️ Specify experiment name(s) or use -A option.")
 
 
 def command_add(args):

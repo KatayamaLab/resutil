@@ -96,3 +96,6 @@ class Box(Storage):
                 self.client.file(item.id).rename(new_ex_name + ".zip")
                 return
         raise ValueError(f"Experiment {ex_name} not found")
+
+    def exist_experiment(self, ex_name: str) -> bool:
+        return ex_name in self.get_all_experiment_names()
