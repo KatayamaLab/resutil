@@ -332,8 +332,6 @@ def command_pull(args):
                 download(ex_name, config.results_dir, storage)
             else:
                 download_with_dependency(ex_name, config.results_dir, storage)
-
-        print(args.experiments)
         print("✅ Downloaded")
     elif args.all:
         ex_names_to_upload = find_undownloaded_ex_dirs(config.results_dir, storage)
