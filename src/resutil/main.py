@@ -162,9 +162,6 @@ def main(verbose=True):
                 if user_confirm(
                     "🔔 Interrupted by user. Do you want to [bold]delete[/bold] experiment file for trial?",
                     default="n",
-                ) and user_confirm(
-                    ".....Are your sure to [bold]DELETE[/bold] it?",
-                    default="n",
                 ):
                     delete_ex_dir(ex_dir_path)
                     print(f"🗑️  Deleted [bold]{ex_dir_path}[/bold]")
@@ -175,9 +172,6 @@ def main(verbose=True):
                 if user_confirm(
                     "❌ An Exception has occured. Do you want to [bold]delete[/bold] experiment file for trial?",
                     default="n",
-                ) and user_confirm(
-                    ".....Are your sure to [bold]DELETE[/bold] it?",
-                    default="n",
                 ):
                     delete_ex_dir(ex_dir_path)
                     print(f"🗑️  Deleted [bold]{ex_dir_path}[/bold]")
@@ -187,15 +181,6 @@ def main(verbose=True):
                 print("----------------------------------")
                 traceback.print_exception(type(e), e, e.__traceback__)
                 print("----------------------------------")
-
-            ex_names_to_upload = find_unuploaded_ex_dirs(config.results_dir, storage)
-
-            n = len(ex_names_to_upload)
-            if n > 0:
-                print(
-                    f"ℹ️ There are {n} other experiment directory(s) that have not been uploaded."
-                )
-
             print("✅ Done")
 
         return wrapper
