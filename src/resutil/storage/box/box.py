@@ -60,6 +60,8 @@ class Box(Storage):
         }
 
     def upload_experiment(self, zip_path: str):
+        if self.exist_experiment(basename(zip_path)[:-4]):
+            self.remove_experiment(basename(zip_path)[:-4])
         self.client.folder(self.project_folder.id).upload(zip_path, basename(zip_path))
 
     def download_experiment(self, zip_path: str):

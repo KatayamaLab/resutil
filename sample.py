@@ -12,7 +12,6 @@ def main_func(params):
 
     parser = argparse.ArgumentParser("sample")
     parser.add_argument("--test_arg", type=str, help="test")
-    parser.add_argument("test_input", type=str, help="test input", default="")
     parsed_args, unknown = parser.parse_known_args()
 
     with open(join(params.ex_dir, "test.txt"), "w") as f:
@@ -25,6 +24,7 @@ def main_func(params):
 
     for i in range(5):
         print(f"Sample program finish in {5-i} sec")
+        params.save_checkpoint()
         sleep(1)
 
 

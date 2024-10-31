@@ -26,8 +26,12 @@ from .core import (
 
 
 class resutil_args:
-    def __init__(self, ex_dir):
+    def __init__(self, ex_dir, checkpoint_callback):
         self.ex_dir = ex_dir
+        self.checkpoint_callback = checkpoint_callback
+
+    def save_checkpoint(self):
+        self.checkpoint_callback()
 
 
 def get_comment(env_args, config):
@@ -143,9 +147,13 @@ def main(verbose=True):
             # Run the main function
             print("🚀 Running the main function...")
 
+            def checkpoint_callback():
+                print("📁 Uploading the results up to this point...")
+                upload(ex_name, config.results_dir, storage)
+
             # if resutil is NOT interactive, run the function and upload the result
             if env_args.no_interactive:
-                func(resutil_args(ex_dir_path), *args, **kwargs)
+                func(resutil_args(ex_dir_path, checkpoint_callback), *args, **kwargs)
                 print("")
                 if not (env_args.no_remote or env_args.debug_mode):
                     upload(ex_name, config.results_dir, storage)
@@ -153,7 +161,7 @@ def main(verbose=True):
 
             # if resutil is interactive, ask the user to confirm before running the function
             try:
-                func(resutil_args(ex_dir_path), *args, **kwargs)
+                func(resutil_args(ex_dir_path, checkpoint_callback), *args, **kwargs)
                 print("")
                 if not (env_args.no_remote or env_args.debug_mode):
                     upload(ex_name, config.results_dir, storage)
