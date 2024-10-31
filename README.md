@@ -264,6 +264,10 @@ When running code that integrates Resutil, you can use the following environment
 
 `RESUTIL_DEBUG` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be unloaded to the cloud storage.
 
+## Saving checkpoint
+
+For long-running executions, call `param.save_checkpoint()` to temporarily upload the data in the experiment directory.
+
 ## Directory structure in the cloud storage
 
 ```plain text
