@@ -88,16 +88,6 @@ if __name__ == "__main__":
     main_func()
 ```
 
-### Tips for Using argparse
-
-Resutil uses the options `--resutil_comment` and `--resutil_no_interactive`. If you use argparse in the main code where you want to integrate Resutil, these options will cause an error as undefined arguments. Please use `parse_known_args()` instead of `parse_args()` as shown below.
-
-```python
-    parser = argparse.ArgumentParser("Your code")
-    parser.add_argument("--arg1", type=str)
-    parser.add_argument("arg2", type=str, help="test input")
-    parsed_args, unknown = parser.parse_known_args()  # Use parse_known_args instead of parse_args
-```
 
 ## Usage
 

@@ -85,16 +85,6 @@ if __name__ == "__main__":
     main_func()
 ```
 
-### argparseを用いるときの注意点
-
-Resutilでは`--reusitl_comment`と`--resutil_no_interactive`というオプションを用います。Resutilを組み込みたいメインコードでargparseを用いると、これらのオプションが定義されていない引数としてエラーが発生します。。以下のように`parse_arg()`の代わりに`parse_known_args()`を用いてください。
-
-```python
-    parser = argparse.ArgumentParser("Your code")
-    parser.add_argument("--arg1", type=str)
-    parser.add_argument("arg2", type=str, help="test input")
-    parsed_args, unknown = parser.parse_known_args()  # parse_argsの代わりにparse_known_argsを使う
-```
 
 ## 使用方法
 
