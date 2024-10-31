@@ -85,16 +85,6 @@ if __name__ == "__main__":
     main_func()
 ```
 
-### argparseを用いるときの注意点
-
-Resutilでは`--reusitl_comment`と`--resutil_no_interactive`というオプションを用います。Resutilを組み込みたいメインコードでargparseを用いると、これらのオプションが定義されていない引数としてエラーが発生します。。以下のように`parse_arg()`の代わりに`parse_known_args()`を用いてください。
-
-```python
-    parser = argparse.ArgumentParser("Your code")
-    parser.add_argument("--arg1", type=str)
-    parser.add_argument("arg2", type=str, help="test input")
-    parsed_args, unknown = parser.parse_known_args()  # parse_argsの代わりにparse_known_argsを使う
-```
 
 ## 使用方法
 
@@ -262,6 +252,10 @@ Resutilを組み込んだコードを実行する際には以下の２つの引�
 `--reusitl_comment COMMENT` 実行開始時に求められるコメントを指定します。実行時にコメントを求められなくなります。
 
 `--resutil_no_interactive` 非インタラクティブモードにします。実行時にユーザーへ問い合わせをしなくなります。バッチジョブとして実行する場合に利用します。上記の`--reusitl_comment COMMENT`が指定されていない場合には実験ディレクトリにコメントは付与されません。
+
+## チェックポイントの保存
+
+長時間にわたる実行時に実験ディレクトリに入っているデータを一時的にアップロードしたい場合には`param.save_checkpoint()`を呼び出します。
 
 
 ## クラウドストレージのディレクトリ構成

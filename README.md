@@ -88,16 +88,6 @@ if __name__ == "__main__":
     main_func()
 ```
 
-### Tips for Using argparse
-
-Resutil uses the options `--resutil_comment` and `--resutil_no_interactive`. If you use argparse in the main code where you want to integrate Resutil, these options will cause an error as undefined arguments. Please use `parse_known_args()` instead of `parse_args()` as shown below.
-
-```python
-    parser = argparse.ArgumentParser("Your code")
-    parser.add_argument("--arg1", type=str)
-    parser.add_argument("arg2", type=str, help="test input")
-    parsed_args, unknown = parser.parse_known_args()  # Use parse_known_args instead of parse_args
-```
 
 ## Usage
 
@@ -273,6 +263,10 @@ When running code that integrates Resutil, you can use the following environment
 `RESUTIIL_REMOTE` Restrains from uploading results to the cloud storage.
 
 `RESUTIL_DEBUG` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be unloaded to the cloud storage.
+
+## Saving checkpoint
+
+For long-running executions, call `param.save_checkpoint()` to temporarily upload the data in the experiment directory.
 
 ## Directory structure in the cloud storage
 

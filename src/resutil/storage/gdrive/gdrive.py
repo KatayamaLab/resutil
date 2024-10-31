@@ -63,6 +63,9 @@ class GDrive(Storage):
         }
 
     def upload_experiment(self, zip_path: str):
+        if self.exist_experiment(basename(zip_path)[:-4]):
+            self.remove_experiment(basename(zip_path)[:-4])
+
         file_metadata = {
             "name": basename(zip_path),  # アップロードするファイル名
             "parents": [self.project_dir_id],  # アップロード先のフォルダID
