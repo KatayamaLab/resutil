@@ -1,5 +1,5 @@
 # Resutil
-Japanese readme is [here]([https://](https://github.com/KatayamaLab/resutil/blob/main/README.ja.md))
+Japanese readme is [here](https://github.com/KatayamaLab/resutil/blob/main/README.ja.md)
 
 ## What is Resutil
 
