@@ -2,7 +2,7 @@
 
 ## Resutilとは
 
-**Resutil**は、Pythonプロジェクトから得られた実験結果データを管理するためのユーティリティです。コードや入力データなどの依存関係と共に結果データを管理します。データはクラウドに同期され、チームでの共有とコラボレーションが可能です。
+**Resutil**は、Pythonプロジェクトから得られた実験結果データを管理するためのユーティリティです。コードや入力データなどの依存関係と共に結果データを管理します。データは Google Cloud Storage（または Google Drive）に同期され、チームでの共有とコラボレーションが可能です。
 
 ## なぜResutilを選ぶのか？
 
@@ -12,7 +12,7 @@
 
 ## 特徴
 
-- プログラムの実行終了後に特定のディレクトリに保存された実験データをクラウド（現在はBoxのみ）に同期します。
+- プログラムの実行終了後に特定のディレクトリに保存された実験データをクラウド（標準は Google Cloud Storage、または Google Drive）に同期します。
 - 実験を再現するために必要な情報をYAMLファイルに保存します。
   - 実行コマンド
   - 引数で指定された入力ファイル（resutilで管理しているフォルダ内のファイルのみ）
@@ -30,20 +30,18 @@
 pip install resutil
 ```
 
-[Box](https://developer.box.com/guides/authentication/jwt/)からJWT（JSON Web Tokens）キーを取得し、`key.json`として保存します。
+Google Cloud Storage 用のサービスアカウント鍵（後述の手順でダウンロード）を `key.json` としてプロジェクトルートに保存します。鍵の例:
 
-```JSON
+```json
 {
-  "boxAppSettings": {
-    "clientID": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "appAuth": {
-      "publicKeyID": "xxxxxxxx",
-      "privateKey": "-----BEGIN ENCRYPTED PRIVATE KEY-----\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n-----END ENCRYPTED PRIVATE KEY-----\n",
-      "passphrase": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    }
-  },
-  "enterpriseID": "796607301"
+    "type": "service_account",
+    "project_id": "your-gcp-project",
+    "private_key_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n-----END PRIVATE KEY-----\n",
+    "client_email": "resutil-bot@your-gcp-project.iam.gserviceaccount.com",
+    "client_id": "123456789012345678901",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token"
 }
 ```
 
@@ -55,13 +53,13 @@ $ resutil init
 Input project name (resutil): MyProj
 Input directory name to store results (results): results
 Do you want to add .gitignore to results? (Y/n): Y
-Input storage_type (box): box
+Input storage_type (gcs/gdrive): gcs
 Input key file_path (key.json): key.json
 Do you want to add key.json to .gitignore? (Y/n): Y
-Input folder id of base dir: 123456789012
+Input bucket name: resutil
 ✅ Initialized.
 ```
-
+バケット名は Cloud Storage のバケット名です。`resutil-conf.yaml`というファイルが作成されます。
 フォルダーIDはBoxのフォルダーIDで、Box上でフォルダーを表示しているときのURL（例：https://xxxx.app.box.com/folder/123456789012）の数値部分です。
 
 `resutil-conf.yaml`というファイルが作成されます。
@@ -117,83 +115,25 @@ $ python sample.py
 
 ## クラウドストレージ設定方法
 
-ResutilはGoogle Cloud Storage、Google Drive、およびBoxをサポートしています。これらのクラウドサービスに接続するには、以下の設定が必要です。
+ResutilはGoogle Cloud Storage（標準）とGoogle Driveをサポートしています。各サービスに接続するための手順は以下の通りです。
 
-### Google Cloud Storage
+### Google Cloud Storage（推奨）
 
-1. **プロジェクトの作成**:
-    - まだプロジェクトがない場合は、[Google Cloud Console](https://console.cloud.google.com/)にアクセスして新しいプロジェクトを作成します。
-2. **Cloud Storage APIを有効にする**:
-    - Google Cloud Consoleの[APIライブラリ](https://console.cloud.google.com/apis/library)に移動します。
-    - 「Cloud Storage」を検索し、プロジェクトのAPIを有効にします。
-3. **ストレージバケットの作成**:
-    - Google Cloud Consoleの[Cloud Storageブラウザ](https://console.cloud.google.com/storage/browser)に移動します。
-    - 「バケットを作成」をクリックします。
-    - バケットに名前を付け、ストレージクラスを選択し、バケットの場所を設定するプロンプトに従います。
-4. **サービスアカウントの作成**:
-    - Google Cloud Consoleの[IAMと管理](https://console.cloud.google.com/iam-admin/serviceaccounts)セクションに移動します。
-    - 「サービスアカウントを作成」をクリックします。
-    - サービスアカウントの名前と説明を入力し、「作成」をクリックします。
-5. **サービスアカウントに権限を付与**:
-    - サービスアカウントに必要な権限を付与するためのロール「Storageオブジェクトユーザー」を選択します。
-    - 「続行」をクリックし、その後「完了」をクリックします。
-6. **サービスアカウントのキーを作成してダウンロード**:
-    - 先ほど作成したサービスアカウントをクリックします。
-    - 「キー」タブに移動します。
-    - 「キーを追加」、次に「新しいキーを作成」をクリックします。
-    - 「JSON」をキーの種類として選択し、「作成」をクリックします。キーが含まれたファイルがコンピュータにダウンロードされます。
+1. **GCPプロジェクトを作成／選択**: [Google Cloud Console](https://console.cloud.google.com/)でプロジェクトを作成するか既存を利用します。
+2. **Cloud Storage API を有効化**: [APIライブラリ](https://console.cloud.google.com/apis/library)で「Cloud Storage」を検索し有効化します。
+3. **バケットを作成**: [Cloud Storage ブラウザ](https://console.cloud.google.com/storage/browser)で「バケットを作成」を選び、名前（例: `resutil`）、クラス、リージョンを設定します。
+4. **サービスアカウントを作成**: [IAM と管理 → サービスアカウント](https://console.cloud.google.com/iam-admin/serviceaccounts)で「サービスアカウントを作成」をクリックし、例: `resutil-bot` を作成します。
+5. **権限付与**: バケットに対し `Storage Object Admin`（少なくとも `Storage Object User` + `Storage Legacy Bucket Reader`）ロールを付与します。
+6. **鍵の作成とダウンロード**: サービスアカウント詳細の「キー」→「キーを追加」→「新しいキーを作成」→ 種類 `JSON` でダウンロードし、プロジェクトルートに `key.json` として保存（`.gitignore` へ追加推奨）。
+7. **`resutil init` を実行**: ストレージ種別に `gcs` を選び、`key.json` とバケット名を入力します。
 
 ### Google Drive
 
-1. **Google Driveにフォルダを作成**:
-    - [Google Drive](https://drive.google.com/)を開きます。
-    - 「新規」をクリックし、「フォルダ」を選択します。
-    - フォルダに名前を付けて「作成」をクリックします。
-2. **フォルダIDを取得**:
-    - 作成したフォルダに移動します。
-    - フォルダIDは、URLの`folders/`の後に続く部分です。例えば、`https://drive.google.com/drive/folders/1a2b3c4d5e6f`というURLの場合、フォルダIDは`1a2b3c4d5e6f`です。
-3. **サービスアカウントの作成**:
-    - [Google Cloud Console](https://console.cloud.google.com/)に移動します。
-    - プロジェクトを選択するか、新しいプロジェクトを作成します。
-    - [IAMと管理](https://console.cloud.google.com/iam-admin/serviceaccounts)セクションに移動します。
-    - 「サービスアカウントを作成」をクリックします。
-    - サービスアカウントの名前と説明を入力し、「作成」をクリックします。
-4. **サービスアカウントのキーを作成してダウンロード**:
-    - 先ほど作成したサービスアカウントをクリックします。
-    - 「キー」タブに移動します。
-    - 「キーを追加」、次に「新しいキーを作成」をクリックします。
-    - 「JSON」をキーの種類として選択し、「作成」をクリックします。キーが含まれたファイルがコンピュータにダウンロードされます。
-5. **Google Drive APIを有効にする**:
-    - Google Cloud Consoleの[APIライブラリ](https://console.cloud.google.com/apis/library)に移動します。
-    - 「Google Drive API」を検索し、プロジェクトのAPIを有効にします。
-6. **フォルダを共有**:
-    - Google Driveで、作成したフォルダを右クリックします。
-    - 「共有」を選択します。
-    - 「ユーザーやグループと共有」フィールドに、サービスアカウントのメールアドレス（JSONキーにある`client_email`の下にあります）を入力します。
-    - サービスアカウントに`編集者`のアクセス権を与えます。
-    - 「送信」をクリックします。
-
-### Box
-
-Boxの開発者コンソールからJWT（JSON Web Token）を取得する手順をご案内します。以下の手順に従ってください：
-
-1. **Boxアプリケーションの作成**
-    - [開発者コンソール](https://account.box.com/login)にアクセスしてBoxアカウントにログインします。
-    - 「アプリの新規作成」をクリックします。
-    - アプリに名前を付け、「次へ」をクリックします。
-    - 「カスタムアプリ」を選択し、「サーバー認証 (JWTを使用)」を選びます。
-
-2. **アプリケーションの設定**
-    - アプリの設定で、「構成」タブに移動します。
-    - 「アプリケーションスコープ」では、「Boxに格納されているすべてのファイルとフォルダの読み取り/書き込み」の2つのアクセスレベルを選択します。
-    - 下にスクロールして「公開キーの追加と管理」セクションで「公開/秘密キーペアを生成」をクリックします。これにより、アプリのクレデンシャルが含まれた`.json`ファイルがダウンロードされます。
-
-3. **サービスアカウントの作成**
-    - 「承認」タブで「サービスアカウントを作成」をクリックします。
-    - 指示に従ってサービスアカウントを作成します。このアカウントはアプリの認証に使用されます。
-
-4. **サービスアカウントに権限を付与**
-    - 使用したいフォルダに対して、サービスアカウント“AutomationUser_xxxxx@boxdevedition.com”に編集権限を与えます。
+1. [Google Drive](https://drive.google.com/)でフォルダを作成し、フォルダID（URL の `folders/` 以降）を控えます。
+2. GCP でプロジェクトとサービスアカウントを作成し、JSON鍵をダウンロードします。
+3. **Google Drive API** を有効化します。
+4. 作成したフォルダをサービスアカウントの `client_email` で共有し、`編集者` 権限を付与します。
+5. `resutil init` でストレージ種別に `gdrive` を選び、`key.json` とフォルダIDを入力します。
 
 
 ## コマンド
@@ -205,10 +145,10 @@ Boxの開発者コンソールからJWT（JSON Web Token）を取得する手順
 ```yaml
 project_name: MyProj
 results_dir: results/
-storage_type: box
+storage_type: gcs
 storage_config:
-  base_folder_id: xxxx
-  key_file: key.json
+  backet_name: resutil  # バケット名
+  key_file_path: key.json
 ```
 
 ### `resutil push`
@@ -261,19 +201,19 @@ Resutilを組み込んだコードを実行する際には以下の２つの引�
 ## クラウドストレージのディレクトリ構成
 
 ```plaintext
-BaseDir    # base_dir_idで指定されたベースディレクトリ
-├──MyProj  # プロジェクトディレクトリ
-│   ├── aakuqj_20240511T174522_ex1  # 実験ディレクトリ
-│   │   ├── resutil-exp.yaml       # 実験情報
-│   │   └── data.txt               # データ（例）
-│   ├── aamxrp_20240606T135747_ex2
+<bucket root>
+├── MyProj  # プロジェクトディレクトリ
+│   ├── aakuqj_20240511T174522_ex1.zip  # 実験ディレクトリのzip
+│   │   ├── resutil-exp.yaml            # 実験情報
+│   │   └── data.txt                    # データ（例）
+│   ├── aamxrp_20240606T135747_ex2.zip
 │   │   ├── resutil-exp.yaml
 │   │   ├── data.txt
 │   │   └── uncommited_files       # コミットされていないファイル
 │   │       └── main.py
 │   ...
 │   
-├──OtherProj
+├── OtherProj
 │
 ...
 ```

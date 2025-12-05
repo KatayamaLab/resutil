@@ -3,7 +3,7 @@ Japanese readme is [here]([https://](https://github.com/KatayamaLab/resutil/blob
 
 ## What is Resutil
 
-**Resutil** is a utility to manage experimental result data obtained from Python projects. It also manages dependency such as codes and input data with result data. Data is synced to the cloud for team sharing and collaboration.
+**Resutil** is a utility to manage experimental result data obtained from Python projects. It also manages dependency such as codes and input data with result data. Data is synced to Google Cloud Storage (or Google Drive) for team sharing and collaboration.
 
 ## Why choose Resutil?
 
@@ -14,7 +14,7 @@ Japanese readme is [here]([https://](https://github.com/KatayamaLab/resutil/blob
 
 ## Features
 
-- Sync experimental data saved in a specific directory to the cloud (currently only for Box) after the program execution finished.
+- Sync experimental data saved in a specific directory to Google Cloud Storage (default) or Google Drive after the program execution finished.
 - Save information necessary to reproduce the experiment in a YAML file.
 - Execution command
 - Input files given as arguments (only files within folders managed by resutil)
@@ -32,20 +32,18 @@ Open terminal and run
 pip install resutil
 ```
 
-Get JWT (JSON Web Tokens) key from [Box](https://developer.box.com/guides/authentication/jwt/), and saved as `key.json`:
+Prepare a Google Cloud service account key JSON for Cloud Storage (downloaded later in the setup steps) and save it as `key.json` in your project root. A typical key file looks like:
 
-```JSON
+```json
 {
-  "boxAppSettings": {
-    "clientID": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "appAuth": {
-      "publicKeyID": "xxxxxxxx",
-      "privateKey": "-----BEGIN ENCRYPTED PRIVATE KEY-----\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n-----END ENCRYPTED PRIVATE KEY-----\n",
-      "passphrase": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    }
-  },
-  "enterpriseID": "796607301"
+    "type": "service_account",
+    "project_id": "your-gcp-project",
+    "private_key_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n-----END PRIVATE KEY-----\n",
+    "client_email": "resutil-bot@your-gcp-project.iam.gserviceaccount.com",
+    "client_id": "123456789012345678901",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token"
 }
 ```
 
@@ -57,16 +55,14 @@ $ resutil init
 Input project name (resutil): MyProj
 Input directory name to store results (results): results
 Do you want to add .gitignore to results? (Y/n): Y
-Input storage_type (box): box
+Input storage_type (gcs/gdrive): gcs
 Input key file_path (key.json): key.json
 Do you want to add key.json to .gitignore? (Y/n): Y
-Input folder id of base dir: 123456789012
+Input bucket name: resutil
 ✅ Initialized.
 ```
 
-The folder id is the Box folder ID, which is the numeric part of the URL when viewing the folder on Box (e.g., https://xxxx.app.box.com/folder/123456789012).
-
-A file named `resutil-conf.yaml` will be created.
+The bucket name is your Cloud Storage bucket, and `resutil-conf.yaml` will be created with this configuration.
 
 Modify main function in your project like:
 
@@ -118,83 +114,25 @@ $ python sample.py
 
 ## How to setup cloud storage for Resutil
 
-Resutil supports Google Cloud Storage, Google Drive, and Box for a cloud storage to store result files. To connect these cloud services following setup will be required.
+Resutil supports Google Cloud Storage (default) and Google Drive. Below are the steps for each.
 
-### Google Cloud Storage
+### Google Cloud Storage (recommended)
 
-1. **Create a Project**:
-    - If you don't already have a project, go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
-2. **Enable the Cloud Storage API**:
-    - Go to the [API Library](https://console.cloud.google.com/apis/library) in the Google Cloud Console.
-    - Search for "Cloud Storage" and enable the API for your project.
-3. **Create a Storage Bucket**:
-    - In the Google Cloud Console, go to the [Cloud Storage Browser](https://console.cloud.google.com/storage/browser).
-    - Click on "Create Bucket."
-    - Follow the prompts to name your bucket, select a storage class, and set the location for your bucket.
-4. **Create a Service Account**:
-    - In the Google Cloud Console, go to the [IAM & Admin](https://console.cloud.google.com/iam-admin/serviceaccounts) section.
-    - Click on "Create Service Account."
-    - Provide a name and description for the service account, and click "Create."
-5. **Grant Permissions to the Service Account**:
-    - Select the "Storage Object User" roles that grant the necessary permissions to the service account.
-    - Click "Continue," and then "Done."
-6. **Create and Download a Key for the Service Account**:
-    - Click on the service account you just created.
-    - Go to the "Keys" tab.
-    - Click "Add Key," then "Create New Key."
-    - Choose "JSON" as the key type, and click "Create." The key file will be downloaded to your computer.
+1. **Create a GCP project (if needed)**: In the [Google Cloud Console](https://console.cloud.google.com/), create or reuse a project.
+2. **Enable Cloud Storage API**: Open [API Library](https://console.cloud.google.com/apis/library), search for “Cloud Storage”, and enable it.
+3. **Create a bucket**: Go to [Cloud Storage Browser](https://console.cloud.google.com/storage/browser), click **Create Bucket**, and set a name (e.g., `resutil`) and location/class.
+4. **Create a service account**: In [IAM & Admin → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts), click **Create Service Account** and name it (e.g., `resutil-bot`).
+5. **Grant permissions**: Give the service account the `Storage Object Admin` (or at least `Storage Object User` + `Storage Legacy Bucket Reader`) role for the bucket so it can read/write objects.
+6. **Create and download a key**: On the service account page, open **Keys** → **Add Key** → **Create new key** → choose **JSON**, then download `key.json` and place it in your project root (add to `.gitignore`).
+7. **Run `resutil init`**: Choose `gcs`, enter the path to `key.json`, and the bucket name you created.
 
 ### Google Drive
 
-1. **Create a Folder in Google Drive**:
-    - Open [Google Drive](https://drive.google.com/).
-    - Click on "New" and select "Folder."
-    - Name the folder and click "Create."
-2. **Get the Folder ID**:
-    - Navigate to the folder you just created.
-    - The folder ID is the part of the URL after `folders/`. For example, in the URL `https://drive.google.com/drive/folders/1a2b3c4d5e6f`, the folder ID is `1a2b3c4d5e6f`.
-3. **Create a Service Account**:
-    - Go to the [Google Cloud Console](https://console.cloud.google.com/).
-    - Select your project or create a new one.
-    - Navigate to the [IAM & Admin](https://console.cloud.google.com/iam-admin/serviceaccounts) section.
-    - Click "Create Service Account."
-    - Provide a name and description for the service account, and click "Create."
-4. **Create and Download a Key for the Service Account**:
-    - Click on the service account you just created.
-    - Go to the "Keys" tab.
-    - Click "Add Key," then "Create New Key."
-    - Choose "JSON" as the key type, and click "Create." The key file will be downloaded to your computer.
-5. **Enable the Google Drive API**:
-    - Go to the [API Library](https://console.cloud.google.com/apis/library) in the Google Cloud Console.
-    - Search for "Google Drive API" and enable it for your project.
-6. **Share the Folder**:
-    - In Google Drive, right-click on the folder you created.
-    - Select "Share."
-    - In the "Share with people and groups" field, enter the email address of the service account (you can find this in the JSON key file under `client_email`).
-    - Give the service account `Editor` access.
-    - Click "Send."
-
-### Box
-
-Sure, I can guide you through the process of obtaining a JWT (JSON Web Token) from Box's developer console. Follow these steps:
-
-1. **Create a Box Application**
-    - Go to the [Box Developer Console](https://account.box.com/login) and log in with your Box account.
-    - Click on "Create New App".
-    - Give your app a name and click "Next".
-    - Choose "Custom App" and select "Server Authentication (with JWT)".
-
-2. **Configure Your Application**
-    - In your app's settings, go to the "Configuration" tab.
-    - Under "Application Scopes", choose two access levels, "Read/Write all files and folders stored in Box".
-    - Scroll down to the "Add and Manage Public Keys" section and click "Generate a Public/Private Keypair". This will download a `.json` file containing your app's credentials.
-
-3. **Create a Service Account**
-    - In the "Authorization" tab, click on "Create Service Account".
-    - Follow the prompts to create the service account. This account will be used to authenticate your app.
-
-4. **Grant permissions to the service account**
-    - Grant the service account “AutomationUser_xxxxx@boxdevedition.com” editor permissions for the folder you want to use.
+1. Create a folder in [Google Drive](https://drive.google.com/) and note the folder ID (the part after `folders/` in the URL).
+2. In Google Cloud Console, create/reuse a project and a service account; download a JSON key.
+3. Enable **Google Drive API** for the project.
+4. Share the Drive folder with the service account email from the JSON key, giving `Editor` access.
+5. Run `resutil init`, choose `gdrive`, set `key.json`, and provide the base folder ID.
     
 ## Commands
 
@@ -205,10 +143,10 @@ Sure, I can guide you through the process of obtaining a JWT (JSON Web Token) fr
 ```yaml
 project_name: MyProj
 results_dir: results/
-storage_type: box
+storage_type: gcs
 storage_config:
-  base_folder_id: xxxx
-  key_file: key.json
+  backet_name: resutil  # bucket name
+  key_file_path: key.json
 ```
 
 ### `resutil push`
@@ -271,8 +209,8 @@ For long-running executions, call `param.save_checkpoint()` to temporarily uploa
 ## Directory structure in the cloud storage
 
 ```plain text
-BaseDir    # Base directory specified base_dir_id
-├──MyProj  # Project directory
+<bucket root>
+├── MyProj  # Project directory
 │   ├── aakuqj_20240511T174522_ex1.zip  # zip file of Experiment directory
 │   │   ├── resutil-exp.yaml            # Experiment information
 │   │   └── data.txt                    # Data (example)
@@ -283,7 +221,7 @@ BaseDir    # Base directory specified base_dir_id
 │   │       └── main.py
 │   ...
 │   
-├──OtherProj
+├── OtherProj
 │
 ...
 ```
