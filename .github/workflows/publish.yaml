@@ -3,46 +3,31 @@ name: Publish Python Package
 on:
   push:
     tags:
-      - 'v*'  # タグが v で始まる場合にトリガー
+      - "v*" # タグが v で始まる場合にトリガー
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Check out code
-      uses: actions/checkout@v3
+      - name: Check out code
+        uses: actions/checkout@v5
 
-    # - name: Set up Rye and 
-    #   uses: actions/setup-python@v4
-    #   with:
-    #     python-version: '3.x'  # 必要なPythonバージョンを指定
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
 
+      - name: Build (wheel and sdist)
+        run: uv build --no-sources
 
-    - name: Enable caching and define a custom cache key prefix
-      id: setup-rye
-      uses: eifinger/setup-rye@v3
-      with:
-        enable-cache: true
-        cache-prefix: 'resutil-rye'
+      - name: Save build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
 
-    - name: Build
-      run: |
-        rye sync
-        rye build --wheel
-
-    - name: Save build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: dist
-        path: dist/*
-
-    - name: Deploy
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-      run: |
-        rye add -d twine==5.1.1
-        rye run twine upload dist/*
-      # 以下はエラーがでるので、一時的に上のように変更。Ryeがtwine5.1.1を採用したら、以下に変更する
-      # rye publish --yes --token ${{ secrets.PYPI_TOKEN }}
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          uvx --from twine==5.1.1 twine upload --skip-existing --non-interactive dist/*

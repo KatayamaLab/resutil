@@ -1,6 +1,6 @@
 [project]
 name = "resutil"
-version = "0.1.18"
+version = "0.1.19"
 description = "Resutil is a utility to manage experimental result data obtained from Python projects. It also manages dependency such as codes and input data with result data. Data is synced to the cloud for team sharing and collaboration."
 authors = [{ name = "nobkat", email = "katayama@rs.tus.ac.jp" }]
 dependencies = [
@@ -8,7 +8,6 @@ dependencies = [
     "rich>=13.7.0",
     "pytest-mock>=3.14.0",
     "gitpython>=3.1.0",
-    "boxsdk[jwt]>=3.9.0",
     "google-cloud-storage>=2.17.0",
     "google-auth>=2.30.0",
     "prompt-toolkit>=3.0.47",
