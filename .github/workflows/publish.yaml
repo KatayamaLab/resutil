@@ -30,4 +30,4 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: |
-          uvx --from twine==5.1.1 twine upload --skip-existing --non-interactive dist/*
+          uvx --from twine==6.2.0 twine upload --skip-existing --non-interactive dist/*
