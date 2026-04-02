@@ -2,7 +2,7 @@
 
 ## Resutilとは
 
-**Resutil**は、Pythonプロジェクトから得られた実験結果データを管理するためのユーティリティです。コードや入力データなどの依存関係と共に結果データを管理します。データは Google Cloud Storage（または Google Drive）に同期され、チームでの共有とコラボレーションが可能です。
+**Resutil**は、Pythonプロジェクトから得られた実験結果データを管理するためのユーティリティです。コードや入力データなどの依存関係と共に結果データを管理します。データはクラウドストレージ（Google Cloud Storage、Google Drive、または Resutil サーバー）に同期され、チームでの共有とコラボレーションが可能です。
 
 ## なぜResutilを選ぶのか？
 
@@ -12,7 +12,7 @@
 
 ## 特徴
 
-- プログラムの実行終了後に特定のディレクトリに保存された実験データをクラウド（標準は Google Cloud Storage、または Google Drive）に同期します。
+- プログラムの実行終了後に特定のディレクトリに保存された実験データをクラウド（Google Cloud Storage、Google Drive、または Resutil サーバー）に同期します。
 - 実験を再現するために必要な情報をYAMLファイルに保存します。
   - 実行コマンド
   - 引数で指定された入力ファイル（resutilで管理しているフォルダ内のファイルのみ）
@@ -53,16 +53,13 @@ $ resutil init
 Input project name (resutil): MyProj
 Input directory name to store results (results): results
 Do you want to add .gitignore to results? (Y/n): Y
-Input storage_type (gcs/gdrive): gcs
+Input storage_type (gcs/gdrive/server): gcs
 Input key file_path (key.json): key.json
 Do you want to add key.json to .gitignore? (Y/n): Y
 Input bucket name: resutil
 ✅ Initialized.
 ```
 バケット名は Cloud Storage のバケット名です。`resutil-conf.yaml`というファイルが作成されます。
-フォルダーIDはBoxのフォルダーIDで、Box上でフォルダーを表示しているときのURL（例：https://xxxx.app.box.com/folder/123456789012）の数値部分です。
-
-`resutil-conf.yaml`というファイルが作成されます。
 
 プロジェクトのメイン関数を以下のように修正します：
 
@@ -85,6 +82,10 @@ if __name__ == "__main__":
 
 
 ## 使用方法
+
+引数なしで `resutil` を実行すると、実験を管理するための対話型TUIが起動します。サブコマンドを直接使うこともできます。
+
+### 実験の実行
 
 Resutilを組み込んだプログラムを実行します。まずコメントを求められ、時系列順のアルファベット、日時、コメントを名前に含む実験結果保存用のディレクトリが自動的に作成されます。
 このディレクトリはzip圧縮され、プログラム終了後に指定されたクラウドストレージにアップロードされます。
@@ -115,7 +116,7 @@ $ python sample.py
 
 ## クラウドストレージ設定方法
 
-ResutilはGoogle Cloud Storage（標準）とGoogle Driveをサポートしています。各サービスに接続するための手順は以下の通りです。
+ResutilはGoogle Cloud Storage（標準）、Google Drive、およびResutilサーバーをサポートしています。各サービスに接続するための手順は以下の通りです。
 
 ### Google Cloud Storage（推奨）
 
@@ -135,6 +136,10 @@ ResutilはGoogle Cloud Storage（標準）とGoogle Driveをサポートして�
 4. 作成したフォルダをサービスアカウントの `client_email` で共有し、`編集者` 権限を付与します。
 5. `resutil init` でストレージ種別に `gdrive` を選び、`key.json` とフォルダIDを入力します。
 
+### Resutil サーバー
+
+1. `resutil init` でストレージ種別に `server` を選び、サーバーURLとバケット名を入力します。
+2. `resutil login` でSSOによる認証を行います。
 
 ## コマンド
 
@@ -177,6 +182,10 @@ storage_config:
 
 例えば、`exp1`と`exp2`という2つの実験があり、新しい実験がそれらに依存している場合、次のコマンドで新しい実験を追加できます: `resutil add "新しい実験" -d exp1 exp2`。これにより、"新しい実験"という名前の新しい実験ディレクトリが作成され、`exp1`と`exp2`がその依存関係として設定されます。
 
+### `resutil list`
+
+`resutil list` コマンドはクラウドストレージ内の実験一覧を表示します。
+
 ### `resutil rm`
 
 `resutil rm` コマンドは実験を削除します。次のように使用できます：`resutil rm [-l] [-r] EXPERIMENT1 [EXPERIMENT2]...`。`--local` または `-l` オプションはローカルの実験ディレクトリのみを削除し、`--remote` または `-r` オプションはクラウド上の実験データを削除します。オプションを指定しない場合、両方の実験データを削除します。
@@ -185,13 +194,29 @@ storage_config:
 
 `resutil comment [EXPERIMENT] [COMMENT]` は、タイムスタンプに続いて実験名にコメントを追加または変更します。既存の実験名が存在する場合、ローカルとクラウドの両方の実験名が変更されます。Resutil は異なる実験名を異なる実験として認識するため、これは他のユーザーが既にプルしている同じ実験の名前には影響しないことに注意してください。
 
-## 実行時の引数
+### `resutil login`
 
-Resutilを組み込んだコードを実行する際には以下の２つの引数を取ることができます。
+`resutil login` はResutilサーバーにSSOで認証します。認証情報は `~/.resutil/credentials.json` に保存されます。`--server-url` でサーバーURLを指定できますが、省略した場合は `resutil-conf.yaml` から読み取ります。
 
-`--reusitl_comment COMMENT` 実行開始時に求められるコメントを指定します。実行時にコメントを求められなくなります。
+### `resutil logout`
 
-`--resutil_no_interactive` 非インタラクティブモードにします。実行時にユーザーへ問い合わせをしなくなります。バッチジョブとして実行する場合に利用します。上記の`--reusitl_comment COMMENT`が指定されていない場合には実験ディレクトリにコメントは付与されません。
+`resutil logout` は保存された認証情報（`~/.resutil/credentials.json`）を削除します。
+
+### `resutil --version`
+
+`resutil --version` はインストールされているResutilのバージョンを表示します。
+
+## 環境変数
+
+Resutilを組み込んだコードを実行する際に、以下の環境変数を使用できます。
+
+`RESUTIL_COMMENT` 実行開始時に求められるコメントを指定します。実行時にコメントを求められなくなります。
+
+`RESUTIL_NO_INTERACTIVE` 非インタラクティブモードにします。実行時にユーザーへ問い合わせをしなくなります。バッチジョブとして実行する場合に利用します。`RESUTIL_COMMENT` が指定されていない場合には実験ディレクトリにコメントは付与されません。
+
+`RESUTIIL_REMOTE` クラウドストレージへのアップロードを抑制します。
+
+`RESUTIL_DEBUG` デバッグモードを有効にします。一時ディレクトリが実験ディレクトリとして使用され、クラウドストレージへのアップロードは行われません。
 
 ## チェックポイントの保存
 
@@ -237,4 +262,6 @@ dependency: Dependencies (automatically extracted from directories in the comman
 
 ## デプロイ方法
 
-Add v*.*.* tag will automatically deploy to PyPI
+1. `pyproject.toml` のバージョン番号を変更
+2. `main` ブランチにマージ
+3. `v*.*.*` タグを付与すると自動的にPyPIにデプロイされます
