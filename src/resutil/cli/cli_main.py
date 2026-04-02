@@ -119,7 +119,13 @@ def main():
     if hasattr(args, "handler"):
         args.handler(args)
     else:
-        parser.print_help()
+        # No subcommand → launch interactive TUI
+        from .interactive import run_interactive
+
+        if not run_interactive():
+            # Not initialized → run init wizard, then launch TUI
+            command_init(args)
+            run_interactive()
 
 
 def get_default_project_name():

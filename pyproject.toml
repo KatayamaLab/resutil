@@ -15,9 +15,10 @@ dependencies = [
     "google-auth-httplib2>=0.2.0",
     "google-auth-oauthlib>=1.2.0",
     "pyreadline3>=3.5.4; platform_system == 'Windows'",
+    "textual>=8.2.1",
 ]
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 license = { file = "LICENSE" }
 
 [build-system]
