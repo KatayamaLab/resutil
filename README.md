@@ -3,7 +3,7 @@ Japanese readme is [here](https://github.com/KatayamaLab/resutil/blob/main/READM
 
 ## What is Resutil
 
-**Resutil** is a utility to manage experimental result data obtained from Python projects. It also manages dependency such as codes and input data with result data. Data is synced to Google Cloud Storage (or Google Drive) for team sharing and collaboration.
+**Resutil** is a utility to manage experimental result data obtained from Python projects. It also manages dependency such as codes and input data with result data. Data is synced to cloud storage (Google Cloud Storage, Google Drive, or a Resutil server) for team sharing and collaboration.
 
 ## Why choose Resutil?
 
@@ -14,7 +14,7 @@ Japanese readme is [here](https://github.com/KatayamaLab/resutil/blob/main/READM
 
 ## Features
 
-- Sync experimental data saved in a specific directory to Google Cloud Storage (default) or Google Drive after the program execution finished.
+- Sync experimental data saved in a specific directory to cloud storage (Google Cloud Storage, Google Drive, or Resutil server) after the program execution finished.
 - Save information necessary to reproduce the experiment in a YAML file.
 - Execution command
 - Input files given as arguments (only files within folders managed by resutil)
@@ -55,7 +55,7 @@ $ resutil init
 Input project name (resutil): MyProj
 Input directory name to store results (results): results
 Do you want to add .gitignore to results? (Y/n): Y
-Input storage_type (gcs/gdrive): gcs
+Input storage_type (gcs/gdrive/server): gcs
 Input key file_path (key.json): key.json
 Do you want to add key.json to .gitignore? (Y/n): Y
 Input bucket name: resutil
@@ -87,6 +87,10 @@ if __name__ == "__main__":
 
 ## Usage
 
+Running `resutil` without arguments launches an interactive TUI for managing experiments. You can also use subcommands directly.
+
+### Running experiments
+
 Run the program integrated with Resutil. You will first be prompted for a comment, and then an experiment result directory will be automatically created. This directory will include a name composed of a sequential alphabet, date, time, and your comment. The directory is then zipped and uploaded to the specified cloud storage after the program finishes.
 
 ```bash
@@ -114,7 +118,7 @@ $ python sample.py
 
 ## How to setup cloud storage for Resutil
 
-Resutil supports Google Cloud Storage (default) and Google Drive. Below are the steps for each.
+Resutil supports Google Cloud Storage (default), Google Drive, and Resutil server. Below are the steps for each.
 
 ### Google Cloud Storage (recommended)
 
@@ -133,6 +137,11 @@ Resutil supports Google Cloud Storage (default) and Google Drive. Below are the 
 3. Enable **Google Drive API** for the project.
 4. Share the Drive folder with the service account email from the JSON key, giving `Editor` access.
 5. Run `resutil init`, choose `gdrive`, set `key.json`, and provide the base folder ID.
+
+### Resutil Server
+
+1. Run `resutil init`, choose `server`, and enter the server URL and bucket name.
+2. Run `resutil login` to authenticate via SSO.
     
 ## Commands
 
@@ -155,7 +164,7 @@ The `resutil push` command is used to upload experimental data to the cloud that
 
 `resutil push [exp_name]` uploads experiment a specific directory to the cloud. Depending directorys included in `exp-config.yaml` are automtically uploaded. `--no-dependency` option restrain automatic dependency upload.
 
-`resutil pull` will upload all experimental data to the cloud.
+`resutil push  --all` will upload all experimental data to the cloud.
 
 This is useful for keeping your local data up-to-date with the data stored in the cloud, especially when multiple people are working on the same project and updating the experimental data.
 
@@ -165,7 +174,7 @@ The `resutil pull` command is used to download a specific experimental data from
 
 `resutil pull [exp_name]` downloads experiment directory from cloud. Depending directorys included in `exp-config.yaml` are automtically downlowded. `--no-dependency` option restrain automatic dependency download.
 
-`resutil pull` will download all experimental data from the cloud that is not currently in your local result directory.
+`resutil pull --all` will download all experimental data from the cloud that is not currently in your local result directory.
 
 This is useful for keeping your local data up-to-date with the data stored in the cloud, especially when multiple people are working on the same project and updating the experimental data.
 
@@ -179,7 +188,7 @@ For example, if you have two experiments `exp1` and `exp2` and a new experiment 
 
 ### `resutil list`
 
-The `resutil list` command list experiments in the cloud storage.
+The `resutil list` command lists experiments in the cloud storage.
 
 ### `resutil rm`
 
@@ -187,20 +196,31 @@ The `resutil rm` command removes experiments. You can use it as follows: resutil
 
 ### `resutil comment` **EXPERIMENTAL**
 
-`resutil comment [EXPERIMENT] [COMMENT]` add or modify a comment following timestamp in the experiment name. Both local and cloud experiment name will change if existing. It should be noted that Resutil regards a differnt experimental name as a different experiment, and this does not affect the name of the same experiment other users have already pull.
+`resutil comment [EXPERIMENT] [COMMENT]` adds or modifies a comment following the timestamp in the experiment name. Both local and cloud experiment names will change if they exist. Note that Resutil regards a different experiment name as a different experiment, so this does not affect the name of the same experiment other users have already pulled.
 
+### `resutil login`
 
-## Environment Valuable
+`resutil login` authenticates with a Resutil server via SSO. Credentials are saved to `~/.resutil/credentials.json`. You can specify the server URL with `--server-url`; otherwise, it is read from `resutil-conf.yaml`.
 
-When running code that integrates Resutil, you can use the following environment valuables:
+### `resutil logout`
+
+`resutil logout` removes saved credentials from `~/.resutil/credentials.json`.
+
+### `resutil --version`
+
+`resutil --version` displays the installed version of Resutil.
+
+## Environment Variables
+
+When running code that integrates Resutil, you can use the following environment variables:
 
 `RESUTIL_COMMENT` Specifies a comment required at the start of execution. This prevents the need to prompt for a comment during execution.
 
 `RESUTIL_NO_INTERACTIVE` Enables non-interactive mode. This prevents any user prompts during execution. This is useful when running as a batch job. If `RESUTIL_COMMENT` is not specified, no comment will be added to the experiment directory.
 
-`RESUTIIL_REMOTE` Restrains from uploading results to the cloud storage.
+`RESUTIIL_REMOTE` Suppresses uploading results to cloud storage.
 
-`RESUTIL_DEBUG` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be unloaded to the cloud storage.
+`RESUTIL_DEBUG` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be uploaded to cloud storage.
 
 ## Saving checkpoint
 

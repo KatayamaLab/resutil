@@ -11,14 +11,14 @@ from ..storage import Storage
 class GCS(Storage):
     def __init__(self, storage_config: dict, project_name: str):
         key_file_path = storage_config["key_file_path"]
-        backet_name = storage_config["backet_name"]
+        bucket_name = storage_config.get("bucket_name") or storage_config.get("backet_name")
         try:
             credentials = service_account.Credentials.from_service_account_file(
                 key_file_path
             )
 
             self.client = storage.Client(credentials=credentials)
-            self.bucket_name = backet_name
+            self.bucket_name = bucket_name
         except FileNotFoundError:
             raise ValueError(f"Key file not found at {key_file_path}")
 

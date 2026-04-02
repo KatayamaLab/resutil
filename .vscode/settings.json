@@ -3,5 +3,13 @@
     "tests"
   ],
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true
+  "python.testing.pytestEnabled": true,
+  "cSpell.words": [
+    "gitpython",
+    "httplib",
+    "httpx",
+    "mypy",
+    "pyreadline",
+    "pytest"
+  ]
 }
