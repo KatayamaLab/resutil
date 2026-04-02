@@ -147,7 +147,7 @@ project_name: MyProj
 results_dir: results/
 storage_type: gcs
 storage_config:
-  backet_name: resutil  # バケット名
+  bucket_name: resutil  # バケット名
   key_file_path: key.json
 ```
 

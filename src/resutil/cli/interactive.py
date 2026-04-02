@@ -1,22 +1,24 @@
 from __future__ import annotations
 
-import re
+import os
+import platform
+import subprocess
 from datetime import datetime
 from os.path import join
-from typing import Optional, Tuple
+from typing import Optional
 
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.theme import Theme
 from textual.containers import Horizontal, Vertical
+from textual.coordinate import Coordinate
 from textual.css.query import NoMatches
 from textual.events import Resize
-from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.widgets import (
     DataTable,
-    Footer,
     Header,
     Input,
     Label,
@@ -25,20 +27,14 @@ from textual.widgets import (
 
 from ..config_file import Config, create_ex_yaml
 from ..core import (
-    download,
     download_with_dependency,
     get_ex_dir_names,
-    initialize,
     remove_local,
-    remove_remote,
-    upload,
     upload_with_dependency,
 )
 from ..ex_dir import (
     change_comment,
     create_ex_dir,
-    find_undownloaded_ex_dirs,
-    find_unuploaded_ex_dirs,
 )
 from ..utils import verify_comment
 
@@ -71,274 +67,6 @@ def _parse_experiment(name: str) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Action Menu (single selection)
-# ---------------------------------------------------------------------------
-
-class ActionMenuScreen(ModalScreen[Optional[str]]):
-    """Modal action menu for a single experiment."""
-
-    BINDINGS = [
-        Binding("escape", "cancel", "Cancel"),
-    ]
-
-    DEFAULT_CSS = """
-    ActionMenuScreen {
-        align: center middle;
-    }
-    #action-dialog {
-        width: 50;
-        height: auto;
-        max-height: 20;
-        border: thick $accent;
-        background: $surface;
-        padding: 1 2;
-    }
-    #action-dialog .action-title {
-        text-style: bold;
-        margin-bottom: 1;
-    }
-    #action-dialog .action-item {
-        padding: 0 1;
-        height: 1;
-    }
-    #action-dialog .action-item:hover {
-        background: $accent;
-    }
-    #action-dialog .action-item.highlighted {
-        background: $accent;
-    }
-    #action-dialog .action-item.destructive {
-        color: $error;
-    }
-    #action-dialog .action-item.push-action {
-        color: $success;
-    }
-    #action-dialog .action-item.pull-action {
-        color: #00bfff;
-    }
-    #action-dialog .action-item.edit-action {
-        color: #5599ff;
-    }
-    #action-dialog .action-item.cancel-action {
-        color: $text-muted;
-    }
-    """
-
-    def __init__(
-        self,
-        ex_name: str,
-        has_local: bool,
-        has_remote: bool,
-        multi: bool = False,
-        count: int = 1,
-        any_local_only: bool = False,
-        any_remote_only: bool = False,
-    ):
-        super().__init__()
-        self.ex_name = ex_name
-        self.has_local = has_local
-        self.has_remote = has_remote
-        self.multi = multi
-        self.count = count
-        self.any_local_only = any_local_only
-        self.any_remote_only = any_remote_only
-        self._items: list[tuple[str, str, str]] = []  # (action_id, label, css_class)
-        self._cursor = 0
-
-    def compose(self) -> ComposeResult:
-        self._items = []
-
-        if self.multi:
-            title = f"Actions ({self.count} selected)"
-            if self.any_local_only:
-                self._items.append(("push", "⬆ Push local-only to remote", "push-action"))
-            if self.any_remote_only:
-                self._items.append(("pull", "⬇ Pull remote-only to local", "pull-action"))
-        else:
-            comment = _parse_experiment(self.ex_name)["comment"]
-            title = f"Actions: {comment or self.ex_name}"
-            if self.has_local and not self.has_remote:
-                self._items.append(("push", "⬆ Push to remote", "push-action"))
-            elif not self.has_local and self.has_remote:
-                self._items.append(("pull", "⬇ Pull from remote", "pull-action"))
-            if self.has_local and self.has_remote and not self.multi:
-                pass  # synced — no push/pull needed
-            if not self.multi:
-                self._items.append(("comment", "✏ Change comment", "edit-action"))
-
-        self._items.append(("remove", "🗑 Remove", "destructive"))
-        self._items.append(("cancel", "✕ Cancel", "cancel-action"))
-
-        with Vertical(id="action-dialog"):
-            yield Label(title, classes="action-title")
-            for i, (action_id, label, css_cls) in enumerate(self._items):
-                classes = f"action-item {css_cls}"
-                if i == 0:
-                    classes += " highlighted"
-                yield Label(label, id=f"act-{action_id}", classes=classes)
-
-    def _update_highlight(self) -> None:
-        for i, (action_id, _, _) in enumerate(self._items):
-            widget = self.query_one(f"#act-{action_id}", Label)
-            if i == self._cursor:
-                widget.add_class("highlighted")
-            else:
-                widget.remove_class("highlighted")
-
-    def key_up(self) -> None:
-        self._cursor = max(0, self._cursor - 1)
-        self._update_highlight()
-
-    def key_down(self) -> None:
-        self._cursor = min(len(self._items) - 1, self._cursor + 1)
-        self._update_highlight()
-
-    def key_enter(self) -> None:
-        action_id = self._items[self._cursor][0]
-        if action_id == "cancel":
-            self.dismiss(None)
-        else:
-            self.dismiss(action_id)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
-# ---------------------------------------------------------------------------
-# Remove Options Screen
-# ---------------------------------------------------------------------------
-
-class RemoveScreen(ModalScreen[Optional[Tuple[bool, bool]]]):
-    """Choose where to remove from: local / remote."""
-
-    BINDINGS = [
-        Binding("escape", "cancel", "Cancel"),
-    ]
-
-    DEFAULT_CSS = """
-    RemoveScreen {
-        align: center middle;
-    }
-    #remove-dialog {
-        width: 50;
-        height: auto;
-        max-height: 16;
-        border: thick $error;
-        background: $surface;
-        padding: 1 2;
-    }
-    #remove-dialog .rm-title {
-        text-style: bold;
-        color: $error;
-        margin-bottom: 1;
-    }
-    #remove-dialog .rm-option {
-        padding: 0 1;
-        height: 1;
-    }
-    #remove-dialog .rm-option:hover {
-        background: $accent;
-    }
-    #remove-dialog .rm-option.highlighted {
-        background: $accent;
-    }
-    #remove-dialog .rm-option.disabled {
-        color: $text-muted;
-    }
-    #remove-dialog .rm-cancel {
-        padding: 0 1;
-        height: 1;
-        color: $text-muted;
-    }
-    #remove-dialog .rm-cancel:hover {
-        background: $accent;
-    }
-    #remove-dialog .rm-cancel.highlighted {
-        background: $accent;
-    }
-    """
-
-    def __init__(self, ex_name: str, has_local: bool, has_remote: bool, multi: bool = False, count: int = 1):
-        super().__init__()
-        self.ex_name = ex_name
-        self.has_local = has_local
-        self.has_remote = has_remote
-        self.multi = multi
-        self.count = count
-        self.rm_local = has_local
-        self.rm_remote = False
-        self._cursor = 0  # 0=local, 1=remote, 2=confirm, 3=cancel
-        self._items: list[str] = []  # ["local", "remote", "confirm", "cancel"]
-
-    def compose(self) -> ComposeResult:
-        title = f"Remove ({self.count} selected)" if self.multi else f"Remove: {_parse_experiment(self.ex_name)['comment'] or self.ex_name}"
-
-        self._items = ["local", "remote", "confirm", "cancel"]
-
-        with Vertical(id="remove-dialog"):
-            yield Label(title, classes="rm-title")
-            yield Label(self._local_label(), id="rm-local", classes="rm-option highlighted" + (" disabled" if not self.has_local else ""))
-            yield Label(self._remote_label(), id="rm-remote", classes="rm-option" + (" disabled" if not self.has_remote else ""))
-            yield Label("", id="rm-spacer")
-            yield Label("▸ Confirm delete", id="rm-confirm", classes="rm-option")
-            yield Label("  ✕ Cancel", id="rm-cancel", classes="rm-cancel")
-
-    def _local_label(self) -> str:
-        check = "☒" if self.rm_local else "☐"
-        suffix = " (not available)" if not self.has_local else ""
-        return f"  {check} Local{suffix}"
-
-    def _remote_label(self) -> str:
-        check = "☒" if self.rm_remote else "☐"
-        suffix = " (not available)" if not self.has_remote else ""
-        return f"  {check} Remote{suffix}"
-
-    def _update_display(self) -> None:
-        self.query_one("#rm-local", Label).update(self._local_label())
-        self.query_one("#rm-remote", Label).update(self._remote_label())
-
-        for i, item_id in enumerate(self._items):
-            widget = self.query_one(f"#rm-{item_id}", Label)
-            if i == self._cursor:
-                widget.add_class("highlighted")
-            else:
-                widget.remove_class("highlighted")
-
-    def key_up(self) -> None:
-        self._cursor = max(0, self._cursor - 1)
-        self._update_display()
-
-    def key_down(self) -> None:
-        self._cursor = min(len(self._items) - 1, self._cursor + 1)
-        self._update_display()
-
-    def key_space(self) -> None:
-        self._toggle_current()
-
-    def key_enter(self) -> None:
-        item = self._items[self._cursor]
-        if item in ("local", "remote"):
-            self._toggle_current()
-        elif item == "confirm":
-            if self.rm_local or self.rm_remote:
-                self.dismiss((self.rm_local, self.rm_remote))
-            else:
-                self.notify("Select at least one target", severity="warning")
-        elif item == "cancel":
-            self.dismiss(None)
-
-    def _toggle_current(self) -> None:
-        item = self._items[self._cursor]
-        if item == "local" and self.has_local:
-            self.rm_local = not self.rm_local
-        elif item == "remote" and self.has_remote:
-            self.rm_remote = not self.rm_remote
-        self._update_display()
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
 
 # ---------------------------------------------------------------------------
 # Confirm Screen
@@ -346,10 +74,6 @@ class RemoveScreen(ModalScreen[Optional[Tuple[bool, bool]]]):
 
 class ConfirmScreen(ModalScreen[bool]):
     """Simple yes/no confirmation dialog."""
-
-    BINDINGS = [
-        Binding("escape", "cancel", "Cancel"),
-    ]
 
     DEFAULT_CSS = """
     ConfirmScreen {
@@ -420,27 +144,18 @@ class ConfirmScreen(ModalScreen[bool]):
             yes_w.remove_class("highlighted")
             yes_w.update("  Yes, delete")
 
-    def key_up(self) -> None:
-        self._cursor = 0
-        self._update_highlight()
-
-    def key_down(self) -> None:
-        self._cursor = 1
-        self._update_highlight()
-
-    def key_left(self) -> None:
-        self._cursor = 0
-        self._update_highlight()
-
-    def key_right(self) -> None:
-        self._cursor = 1
-        self._update_highlight()
-
-    def key_enter(self) -> None:
-        self.dismiss(self._cursor == 0)
-
-    def action_cancel(self) -> None:
-        self.dismiss(False)
+    def on_key(self, event) -> None:
+        event.stop()
+        if event.key in ("up", "left"):
+            self._cursor = 0
+            self._update_highlight()
+        elif event.key in ("down", "right"):
+            self._cursor = 1
+            self._update_highlight()
+        elif event.key == "enter":
+            self.dismiss(self._cursor == 0)
+        elif event.key == "escape":
+            self.dismiss(False)
 
 
 # ---------------------------------------------------------------------------
@@ -449,10 +164,6 @@ class ConfirmScreen(ModalScreen[bool]):
 
 class CommentInputScreen(ModalScreen[Optional[str]]):
     """Input a new comment."""
-
-    BINDINGS = [
-        Binding("escape", "cancel", "Cancel"),
-    ]
 
     DEFAULT_CSS = """
     CommentInputScreen {
@@ -499,8 +210,10 @@ class CommentInputScreen(ModalScreen[Optional[str]]):
         else:
             self.dismiss(None)
 
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+    def on_key(self, event) -> None:
+        if event.key == "escape":
+            event.stop()
+            self.dismiss(None)
 
 
 # ---------------------------------------------------------------------------
@@ -509,10 +222,6 @@ class CommentInputScreen(ModalScreen[Optional[str]]):
 
 class NewExperimentScreen(ModalScreen[Optional[str]]):
     """Create a new experiment."""
-
-    BINDINGS = [
-        Binding("escape", "cancel", "Cancel"),
-    ]
 
     DEFAULT_CSS = """
     NewExperimentScreen {
@@ -554,8 +263,10 @@ class NewExperimentScreen(ModalScreen[Optional[str]]):
         else:
             self.notify("Invalid comment (max 200 chars, no special chars)", severity="error")
 
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+    def on_key(self, event) -> None:
+        if event.key == "escape":
+            event.stop()
+            self.dismiss(None)
 
 
 # ---------------------------------------------------------------------------
@@ -564,11 +275,6 @@ class NewExperimentScreen(ModalScreen[Optional[str]]):
 
 class HelpScreen(ModalScreen[Optional[str]]):
     """Keyboard shortcuts help."""
-
-    BINDINGS = [
-        Binding("escape", "close", "Close"),
-        Binding("question_mark", "close", "Close"),
-    ]
 
     DEFAULT_CSS = """
     HelpScreen {
@@ -604,8 +310,12 @@ class HelpScreen(ModalScreen[Optional[str]]):
             yield Label("Navigation", classes="help-section")
             yield Label("  ↑/↓  k/j    Move cursor", classes="help-line")
             yield Label("  Space        Toggle selection", classes="help-line")
-            yield Label("  a            Select/deselect all (filtered)", classes="help-line")
-            yield Label("  Enter        Open actions menu", classes="help-line")
+            yield Label("  Enter        Copy name to clipboard", classes="help-line")
+            yield Label("")
+            yield Label("Actions", classes="help-section")
+            yield Label("  c            Change comment", classes="help-line")
+            yield Label("  p            Push / Pull", classes="help-line")
+            yield Label("  x            Delete local", classes="help-line")
             yield Label("")
             yield Label("Commands", classes="help-section")
             yield Label("  f /          Focus filter", classes="help-line")
@@ -616,10 +326,8 @@ class HelpScreen(ModalScreen[Optional[str]]):
             yield Label("")
             yield Label("Press any key to close", classes="help-line")
 
-    def on_key(self) -> None:
-        self.dismiss(None)
-
-    def action_close(self) -> None:
+    def on_key(self, event) -> None:
+        event.stop()
         self.dismiss(None)
 
 
@@ -632,9 +340,6 @@ class ResutilApp(App):
 
     TITLE = "resutil"
     CSS = """
-    Screen {
-        background: $background;
-    }
     #main-container {
         height: 1fr;
     }
@@ -687,13 +392,33 @@ class ResutilApp(App):
         Binding("f", "focus_filter", "Filter", priority=True),
         Binding("slash", "focus_filter", "Filter", priority=True),
         Binding("s", "settings", "Settings", priority=True),
-        Binding("a", "select_all", "Select All", priority=True),
+        Binding("c", "shortcut_comment", "Comment", priority=True),
+        Binding("p", "shortcut_push_pull", "Push/Pull", priority=True),
+        Binding("x", "shortcut_delete", "Delete local", priority=True),
     ]
 
     filter_text: reactive[str] = reactive("", layout=False)
 
     def __init__(self, config: Config, storage):
         super().__init__()
+        self.register_theme(Theme(
+            name="resutil-light",
+            dark=False,
+            primary="#004578",
+            secondary="#0178D4",
+            background="#FFFFFF",
+            surface="#F5F5F5",
+            panel="#EEEEEE",
+        ))
+        self.register_theme(Theme(
+            name="resutil-dark",
+            dark=True,
+            primary="#0178D4",
+            secondary="#004578",
+            background="#1E1E1E",
+            surface="#2D2D2D",
+            panel="#363636",
+        ))
         self.config = config
         self.storage = storage
         self._local_names: set[str] = set()
@@ -708,22 +433,54 @@ class ResutilApp(App):
             yield DataTable(id="exp-table", cursor_type="row")
         with Vertical(id="bottom-bar"):
             with Horizontal(id="filter-row"):
-                yield Label("Filter: ", id="filter-label")
+                yield Label("[bold green]F[/]ilter: ", id="filter-label")
                 yield Input(placeholder="type to filter...", id="filter-input")
             yield Static(
-                "[bold green]F[/]ilter  [bold green]N[/]ew experiment  [bold green]S[/]ettings  [bold red]Q[/]uit       Enter actions  [bold]?[/]help",
+                "[bold green]N[/]ew  [bold green]C[/]omment  [bold green]P[/]ush/Pull  [bold red]X[/] delete  [bold green]S[/]ettings  [bold red]Q[/]uit  [bold]?[/]help",
                 id="shortcut-row",
             )
             yield Static(
-                "↑↓ move  Space select  a all",
+                "↑↓ move  [bold]Space[/] select  [bold]Enter[/] copy",
                 id="hint-row",
             )
 
     def on_mount(self) -> None:
+        self.theme = self._detect_theme()
         self.sub_title = self.config.project_name
         self._wide_mode = self.size.width >= 100
         self._refresh_data()
         self._build_table()
+        self._scroll_to_bottom()
+
+    @staticmethod
+    def _detect_theme() -> str:
+        """Detect terminal light/dark and return a Textual theme name."""
+        # macOS: check system appearance (most reliable on macOS)
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["defaults", "read", "-globalDomain", "AppleInterfaceStyle"],
+                capture_output=True, text=True, timeout=1,
+            )
+            # returncode == 0 means "Dark" value exists → dark mode
+            # returncode != 0 means key not found → light mode
+            if result.returncode != 0:
+                return "resutil-light"
+            return "resutil-dark"
+        except Exception:
+            pass
+        # COLORFGBG: set by some terminals, format "fg;bg"
+        colorfgbg = os.environ.get("COLORFGBG", "")
+        if colorfgbg:
+            parts = colorfgbg.split(";")
+            try:
+                bg = int(parts[-1])
+                if bg >= 8:
+                    return "resutil-light"
+                return "resutil-dark"
+            except ValueError:
+                pass
+        return "resutil-dark"
 
     def on_resize(self, event: Resize) -> None:
         new_wide = event.size.width >= 100
@@ -737,7 +494,7 @@ class ResutilApp(App):
         self._local_names = set(get_ex_dir_names(self.config.results_dir))
         self._remote_names = set(self.storage.get_all_experiment_names())
         self._all_experiments = sorted(
-            list(self._local_names | self._remote_names), reverse=True
+            list(self._local_names | self._remote_names)
         )
 
     def _filtered_experiments(self) -> list[str]:
@@ -748,8 +505,20 @@ class ResutilApp(App):
 
     # -- Table building -----------------------------------------------------
 
-    def _build_table(self) -> None:
+    def _build_table(self, cursor_hint: str | None = None) -> None:
+        """Rebuild the table. cursor_hint overrides saved cursor name (for renames)."""
         table = self.query_one("#exp-table", DataTable)
+
+        # Save current cursor and scroll position before rebuild
+        cursor_name = cursor_hint
+        saved_scroll_y = table.scroll_y
+        if cursor_name is None and table.row_count > 0:
+            try:
+                row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+                cursor_name = str(row_key.value)
+            except Exception:
+                pass
+
         table.clear(columns=True)
 
         table.add_column("", key="sel", width=3)
@@ -763,15 +532,36 @@ class ResutilApp(App):
         else:
             table.add_column("DIRECTORY NAME", key="dir")
 
-        for name in self._filtered_experiments():
+        filtered = self._filtered_experiments()
+        for name in filtered:
             self._add_row(table, name)
 
-        count = len(self._filtered_experiments())
+        # Restore cursor and scroll after layout recalculation
+        target_row = None
+        if cursor_name and table.row_count > 0:
+            try:
+                target_row = filtered.index(cursor_name)
+            except ValueError:
+                pass
+        self.call_after_refresh(self._restore_table_state, target_row, saved_scroll_y)
+
+        count = len(filtered)
         total = len(self._all_experiments)
         if self.filter_text:
             self.sub_title = f"{self.config.project_name} — {count}/{total} filtered"
         else:
             self.sub_title = f"{self.config.project_name} — {total} experiments"
+
+    def _restore_table_state(self, target_row: int | None, scroll_y: float) -> None:
+        table = self.query_one("#exp-table", DataTable)
+        if target_row is not None and table.row_count > 0:
+            table.cursor_coordinate = Coordinate(target_row, 0)
+        table.scroll_y = min(scroll_y, table.virtual_size.height)
+
+    def _scroll_to_bottom(self) -> None:
+        table = self.query_one("#exp-table", DataTable)
+        if table.row_count > 0:
+            table.move_cursor(row=table.row_count - 1)
 
     def _add_row(self, table: DataTable, name: str) -> None:
         has_local = name in self._local_names
@@ -780,7 +570,7 @@ class ResutilApp(App):
 
         sel_mark = "[yellow]●[/]" if selected else " "
         local_mark = "[green]✔[/]" if has_local else "[dim]─[/]"
-        remote_mark = "[green]✔[/]" if (has_remote and has_local) else "[#00bfff]✔[/]" if has_remote else "[dim]─[/]"
+        remote_mark = "[green]✔[/]" if (has_remote and has_local) else "[cyan]✔[/]" if has_remote else "[dim]─[/]"
 
         parsed = _parse_experiment(name)
 
@@ -852,91 +642,53 @@ class ResutilApp(App):
             self._selected.add(name)
         self._build_table()
 
-    def action_select_all(self) -> None:
-        filtered = set(self._filtered_experiments())
-        if filtered.issubset(self._selected):
-            # Deselect all filtered
-            self._selected -= filtered
-        else:
-            self._selected |= filtered
-        self._build_table()
 
     # -- Actions ------------------------------------------------------------
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        """Enter key on a row → open action menu."""
-        self._open_actions()
+        """Enter key → copy experiment name to clipboard."""
+        name = self._get_cursor_experiment()
+        if name:
+            self._copy_to_clipboard(name)
+            self.notify(f"Copied: {name}", severity="information")
 
-    def _open_actions(self) -> None:
-        if self._selected:
-            names = [n for n in self._all_experiments if n in self._selected]
-            any_local_only = any(n in self._local_names and n not in self._remote_names for n in names)
-            any_remote_only = any(n not in self._local_names and n in self._remote_names for n in names)
-            self.push_screen(
-                ActionMenuScreen(
-                    ex_name="",
-                    has_local=False,
-                    has_remote=False,
-                    multi=True,
-                    count=len(names),
-                    any_local_only=any_local_only,
-                    any_remote_only=any_remote_only,
-                ),
-                callback=self._on_action_chosen,
-            )
-        else:
-            name = self._get_cursor_experiment()
-            if name is None:
-                return
-            has_local = name in self._local_names
-            has_remote = name in self._remote_names
-            self.push_screen(
-                ActionMenuScreen(
-                    ex_name=name,
-                    has_local=has_local,
-                    has_remote=has_remote,
-                ),
-                callback=self._on_action_chosen,
-            )
-
-    def _on_action_chosen(self, action: str | None) -> None:
-        if action is None:
-            return
-
-        if self._selected:
-            names = [n for n in self._all_experiments if n in self._selected]
-        else:
-            name = self._get_cursor_experiment()
-            names = [name] if name else []
-
-        if not names:
-            return
-
-        if action == "push":
-            self._do_push(names)
-        elif action == "pull":
-            self._do_pull(names)
-        elif action == "comment":
-            if len(names) == 1:
-                self._do_comment(names[0])
-        elif action == "remove":
-            self._do_remove(names)
+    @staticmethod
+    def _copy_to_clipboard(text: str) -> None:
+        system = platform.system()
+        try:
+            if system == "Darwin":
+                subprocess.run(["pbcopy"], input=text.encode(), check=True)
+            elif system == "Linux":
+                try:
+                    subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=True)
+                except FileNotFoundError:
+                    subprocess.run(["xsel", "--clipboard", "--input"], input=text.encode(), check=True)
+            elif system == "Windows":
+                subprocess.run(["clip"], input=text.encode(), check=True)
+        except Exception:
+            pass
 
     @work(thread=True)
     def _do_push(self, names: list[str]) -> None:
-        for name in names:
-            if name in self._local_names and name not in self._remote_names:
-                self.notify(f"Pushing {name}...")
-                upload_with_dependency(name, self.config.results_dir, self.storage)
-        self.app.call_from_thread(self._after_operation, "Push complete")
+        try:
+            for name in names:
+                if name in self._local_names and name not in self._remote_names:
+                    self.notify(f"Pushing {name}...")
+                    upload_with_dependency(name, self.config.results_dir, self.storage)
+            self.app.call_from_thread(self._after_operation, "Push complete")
+        except Exception as e:
+            self.app.call_from_thread(self._after_error, f"Push failed: {e}")
 
     @work(thread=True)
     def _do_pull(self, names: list[str]) -> None:
-        for name in names:
-            if name not in self._local_names and name in self._remote_names:
-                self.notify(f"Pulling {name}...")
-                download_with_dependency(name, self.config.results_dir, self.storage)
-        self.app.call_from_thread(self._after_operation, "Pull complete")
+        try:
+            for name in names:
+                if name not in self._local_names and name in self._remote_names:
+                    self.notify(f"Pulling {name}...")
+                    download_with_dependency(name, self.config.results_dir, self.storage)
+            self.app.call_from_thread(self._after_operation, "Pull complete")
+        except Exception as e:
+            self.app.call_from_thread(self._after_error, f"Pull failed: {e}")
 
     def _do_comment(self, name: str) -> None:
         parsed = _parse_experiment(name)
@@ -952,80 +704,81 @@ class ResutilApp(App):
 
     @work(thread=True)
     def _apply_comment_worker(self, name: str, new_comment: str) -> None:
-        has_local = name in self._local_names
-        has_remote = name in self._remote_names
-        if has_local:
-            change_comment(self.config.results_dir, name, new_comment)
-        if has_remote:
-            self.storage.change_comment(name, new_comment)
-        self.app.call_from_thread(self._after_operation, f"Comment changed")
+        try:
+            has_local = name in self._local_names
+            has_remote = name in self._remote_names
+            # Compute new name for cursor tracking
+            parts = name.split("_", 2)
+            new_name = f"{parts[0]}_{parts[1]}_{new_comment}"
+            if has_local:
+                change_comment(self.config.results_dir, name, new_comment)
+            if has_remote:
+                self.storage.change_comment(name, new_comment)
+            self.app.call_from_thread(self._after_operation_with_cursor, "Comment changed", new_name)
+        except Exception as e:
+            self.app.call_from_thread(self._after_error, f"Comment change failed: {e}")
 
     def _do_remove(self, names: list[str]) -> None:
-        multi = len(names) > 1
-        if multi:
-            any_local = any(n in self._local_names for n in names)
-            any_remote = any(n in self._remote_names for n in names)
-        else:
-            any_local = names[0] in self._local_names
-            any_remote = names[0] in self._remote_names
-
-        self.push_screen(
-            RemoveScreen(
-                ex_name=names[0] if not multi else "",
-                has_local=any_local,
-                has_remote=any_remote,
-                multi=multi,
-                count=len(names),
-            ),
-            callback=lambda result: self._on_remove_options(names, result),
-        )
-
-    def _on_remove_options(self, names: list[str], result: tuple[bool, bool] | None) -> None:
-        if result is None:
+        local_names = [n for n in names if n in self._local_names]
+        if not local_names:
+            self.notify("No local experiments to delete", severity="warning")
             return
-        rm_local, rm_remote = result
 
-        targets = []
-        if rm_local:
-            targets.append("local")
-        if rm_remote:
-            targets.append("remote")
-        target_str = " and ".join(targets)
-
-        details = names[:5]
-        if len(names) > 5:
-            details.append(f"... and {len(names) - 5} more")
+        details = local_names[:5]
+        if len(local_names) > 5:
+            details.append(f"... and {len(local_names) - 5} more")
 
         self.push_screen(
             ConfirmScreen(
-                message=f"Delete {len(names)} experiment(s) from {target_str}?",
+                message=f"Delete {len(local_names)} experiment(s) from local?",
                 details=details,
             ),
-            callback=lambda confirmed: self._execute_remove(names, rm_local, rm_remote, confirmed),
+            callback=lambda confirmed: self._execute_remove(local_names, confirmed),
         )
 
-    def _execute_remove(self, names: list[str], rm_local: bool, rm_remote: bool, confirmed: bool) -> None:
+    def _execute_remove(self, names: list[str], confirmed: bool) -> None:
         if not confirmed:
             return
-        self._execute_remove_worker(names, rm_local, rm_remote)
+        self._execute_remove_worker(names)
 
     @work(thread=True)
-    def _execute_remove_worker(self, names: list[str], rm_local: bool, rm_remote: bool) -> None:
-        if rm_local:
-            local_names = [n for n in names if n in self._local_names]
-            if local_names:
-                remove_local(local_names, self.config.results_dir)
-        if rm_remote:
-            remote_names = [n for n in names if n in self._remote_names]
-            if remote_names:
-                remove_remote(remote_names, self.storage)
-        self.app.call_from_thread(self._after_operation, "Remove complete")
+    def _execute_remove_worker(self, names: list[str]) -> None:
+        try:
+            # Find the experiment just before the deleted ones for cursor placement
+            removed = set(names)
+            filtered = self._filtered_experiments()
+            cursor_hint = None
+            for i, n in enumerate(filtered):
+                if n in removed:
+                    # Take the one before the first removed entry
+                    if i > 0:
+                        cursor_hint = filtered[i - 1]
+                    break
+
+            remove_local(names, self.config.results_dir)
+            if cursor_hint and cursor_hint not in removed:
+                self.app.call_from_thread(self._after_operation_with_cursor, "Remove complete", cursor_hint)
+            else:
+                self.app.call_from_thread(self._after_operation, "Remove complete")
+        except Exception as e:
+            self.app.call_from_thread(self._after_error, f"Remove failed: {e}")
 
     def _after_operation(self, message: str) -> None:
         self._selected.clear()
         self._refresh_data()
         self._build_table()
         self.notify(message, severity="information")
+
+    def _after_operation_with_cursor(self, message: str, cursor_hint: str) -> None:
+        self._selected.clear()
+        self._refresh_data()
+        self._build_table(cursor_hint=cursor_hint)
+        self.notify(message, severity="information")
+
+    def _after_error(self, message: str) -> None:
+        self._refresh_data()
+        self._build_table()
+        self.notify(message, severity="error")
 
     # -- New experiment -----------------------------------------------------
 
@@ -1042,10 +795,53 @@ class ResutilApp(App):
 
     @work(thread=True)
     def _create_experiment_worker(self, comment: str) -> None:
-        ex_name = create_ex_dir(datetime.now(), comment, self.config.results_dir)
-        ex_dir_path = join(self.config.results_dir, ex_name)
-        create_ex_yaml(ex_dir_path, [])
-        self.app.call_from_thread(self._after_operation, f"Created: {ex_name}")
+        try:
+            ex_name = create_ex_dir(datetime.now(), comment, self.config.results_dir)
+            ex_dir_path = join(self.config.results_dir, ex_name)
+            create_ex_yaml(ex_dir_path, [])
+            self.app.call_from_thread(self._after_new_experiment, f"Created: {ex_name}")
+        except Exception as e:
+            self.app.call_from_thread(self._after_error, f"Create failed: {e}")
+
+    def _after_new_experiment(self, message: str) -> None:
+        self._selected.clear()
+        self._refresh_data()
+        self._build_table()
+        self._scroll_to_bottom()
+        self.notify(message, severity="information")
+
+    # -- Keyboard shortcuts (C / P / X) ----------------------------------------
+
+    def _get_target_names(self) -> list[str]:
+        if self._selected:
+            return [n for n in self._all_experiments if n in self._selected]
+        name = self._get_cursor_experiment()
+        return [name] if name else []
+
+    def action_shortcut_comment(self) -> None:
+        names = self._get_target_names()
+        if len(names) == 1:
+            self._do_comment(names[0])
+        elif len(names) > 1:
+            self.notify("Select a single experiment for comment", severity="warning")
+
+    def action_shortcut_push_pull(self) -> None:
+        names = self._get_target_names()
+        if not names:
+            return
+        pushable = [n for n in names if n in self._local_names and n not in self._remote_names]
+        pullable = [n for n in names if n not in self._local_names and n in self._remote_names]
+        if pushable:
+            self._do_push(pushable)
+        elif pullable:
+            self._do_pull(pullable)
+        else:
+            self.notify("Already synced", severity="information")
+
+    def action_shortcut_delete(self) -> None:
+        names = self._get_target_names()
+        if names:
+            self._do_remove(names)
 
     # -- Settings / Help / Quit ---------------------------------------------
 
@@ -1065,20 +861,53 @@ class ResutilApp(App):
 
 def run_interactive():
     """Launch the interactive TUI. Returns True if launched, False if not initialized."""
+    from rich import print as rprint
+
     try:
         config = Config()
         config.load()
     except FileNotFoundError:
         return False
 
-    from ..storage import GCS, GDrive
+    from ..storage import GCS, GDrive, ResutilServerStorage
 
     if config.storage_type in ("gcs", "gs"):
         storage = GCS(config.storage_config, config.project_name)
     elif config.storage_type == "gdrive":
         storage = GDrive(config.storage_config, config.project_name)
+    elif config.storage_type == "server":
+        try:
+            storage = ResutilServerStorage(config.storage_config, config.project_name)
+        except FileNotFoundError:
+            rprint("🔐 Not logged in. Starting login...")
+            from .cli_main import command_login
+
+            class _Args:
+                server_url = None
+            command_login(_Args())
+
+            # Retry after login
+            try:
+                storage = ResutilServerStorage(config.storage_config, config.project_name)
+            except FileNotFoundError:
+                rprint("[red]❌ Login failed. Run 'resutil login' manually.[/red]")
+                return True
+        except PermissionError as e:
+            rprint(f"🔐 {e}")
+            rprint("Re-authenticating...")
+            from .cli_main import command_login
+
+            class _Args:
+                server_url = None
+            command_login(_Args())
+
+            try:
+                storage = ResutilServerStorage(config.storage_config, config.project_name)
+            except Exception as e2:
+                rprint(f"[red]❌ Authentication failed: {e2}[/red]")
+                return True
     else:
-        print(f"Unknown storage type: {config.storage_type}")
+        rprint(f"Unknown storage type: {config.storage_type}")
         return False
 
     app = ResutilApp(config, storage)
