@@ -116,7 +116,8 @@ class ResutilServerStorage(Storage):
             )
         if resp.status_code == 403:
             raise PermissionError(
-                f"Access denied. You don't have permission to access bucket '{self.bucket_name}'."
+                f"Access denied. You don't have permission to access bucket '{self.bucket_name}'.\n"
+                "Run 'resutil login' to authenticate."
             )
         resp.raise_for_status()
         return resp

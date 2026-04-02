@@ -38,8 +38,14 @@ from ..core import (
 config_file_path = "resutil-conf.yaml"
 
 
+def get_version():
+    from importlib.metadata import version
+    return version("resutil")
+
+
 def main():
     parser = argparse.ArgumentParser(description="")
+    parser.add_argument("--version", action="version", version=f"resutil {get_version()}")
     subparsers = parser.add_subparsers()
 
     # init
@@ -114,6 +120,10 @@ def main():
         help="resutil server URL (uses resutil-conf.yaml if not specified)",
     )
     parser_login.set_defaults(handler=command_login)
+
+    # logout
+    parser_logout = subparsers.add_parser("logout", help="Remove saved credentials")
+    parser_logout.set_defaults(handler=command_logout)
 
     # comment
     parser_comment = subparsers.add_parser(
@@ -525,6 +535,15 @@ def command_login(args):
     credentials_path.chmod(0o600)
 
     print("✅ Login successful! Credentials saved to ~/.resutil/credentials.json")
+
+
+def command_logout(args):
+    credentials_path = Path.home() / ".resutil" / "credentials.json"
+    if credentials_path.exists():
+        credentials_path.unlink()
+        print("✅ Logged out. Credentials removed.")
+    else:
+        print("ℹ️ No credentials found.")
 
 
 def command_comment(args):

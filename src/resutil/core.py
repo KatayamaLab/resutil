@@ -44,7 +44,12 @@ def initialize():
 
     elif config.storage_type == "server":
         from .storage import ResutilServerStorage
-        storage = ResutilServerStorage(config.storage_config, config.project_name)
+        try:
+            storage = ResutilServerStorage(config.storage_config, config.project_name)
+        except (PermissionError, FileNotFoundError) as e:
+            print(f"⚠️ {e}")
+            print("Run [bold]resutil login[/bold] to authenticate.")
+            exit(1)
         print("📦 Connected to [bold]Resutil Server[/bold]")
         info = storage.get_info()
         print(f"  🌐 Server URL: [bold]{info['server_url']}[/bold]")

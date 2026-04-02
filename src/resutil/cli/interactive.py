@@ -446,7 +446,8 @@ class ResutilApp(App):
 
     def on_mount(self) -> None:
         self.theme = self._detect_theme()
-        self.sub_title = self.config.project_name
+        from importlib.metadata import version
+        self.sub_title = f"{self.config.project_name} — v{version('resutil')}"
         self._wide_mode = self.size.width >= 100
         self._refresh_data()
         self._build_table()
@@ -547,10 +548,12 @@ class ResutilApp(App):
 
         count = len(filtered)
         total = len(self._all_experiments)
+        from importlib.metadata import version
+        ver = version("resutil")
         if self.filter_text:
-            self.sub_title = f"{self.config.project_name} — {count}/{total} filtered"
+            self.sub_title = f"{self.config.project_name} — v{ver} — {count}/{total} filtered"
         else:
-            self.sub_title = f"{self.config.project_name} — {total} experiments"
+            self.sub_title = f"{self.config.project_name} — v{ver} — {total} experiments"
 
     def _restore_table_state(self, target_row: int | None, scroll_y: float) -> None:
         table = self.query_one("#exp-table", DataTable)
