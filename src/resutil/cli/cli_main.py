@@ -1,7 +1,13 @@
 import argparse
+import json
 import os
+import socket
+import webbrowser
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from os.path import join
 from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlparse, parse_qs
 
 from rich import print
 
@@ -13,7 +19,7 @@ from ..ex_dir import (
 )
 from ..utils import user_confirm, verify_comment
 from ..config_file import Config, create_ex_yaml
-from ..storage import GCS, GDrive
+from ..storage import Storage
 
 from ..core import (
     initialize,
@@ -100,6 +106,14 @@ def main():
         nargs="+",
     )
     parser_rm.set_defaults(handler=command_rm)
+
+    # login
+    parser_login = subparsers.add_parser("login", help="Login to resutil server via SSO")
+    parser_login.add_argument(
+        "--server-url",
+        help="resutil server URL (uses resutil-conf.yaml if not specified)",
+    )
+    parser_login.set_defaults(handler=command_login)
 
     # comment
     parser_comment = subparsers.add_parser(
@@ -195,10 +209,10 @@ def command_init(args):
     # set storage type
     while True:
         d = "gcs"
-        print(f"Input storage_type ([bold]gcs[/bold]/gdrive): ", end="")
+        print(f"Input storage_type ([bold]gcs[/bold]/gdrive/server): ", end="")
         s = input()
         storage_type = s if s != "" else "gcs"
-        if storage_type in ["gcs", "gdrive"]:
+        if storage_type in ["gcs", "gdrive", "server"]:
             break
     config.set_storage_type(storage_type)
 
@@ -225,6 +239,7 @@ def command_init(args):
         config.set_storage_config(storage_config)
 
         try:
+            from ..storage import GCS
             GCS(config.storage_config, config.project_name)
         except Exception as e:
             print("❌ Failed to connect to storage.")
@@ -254,9 +269,34 @@ def command_init(args):
         config.set_storage_config(storage_config)
 
         try:
+            from ..storage import GDrive
             GDrive(config.storage_config, config.project_name)
         except Exception as e:
             print("❌ Failed to connect to storage.")
+            print(f"  [red]{e}[/red]")
+            return
+
+    # set server config
+    elif storage_type == "server":
+        d = "http://localhost:8080"
+        print(f"Input server URL [bold]({d})[/bold]: ", end="")
+        s = input()
+        server_url = s if s != "" else d
+
+        print(f"Input bucket name: ", end="")
+        bucket_name = input()
+
+        storage_config = {"server_url": server_url, "bucket_name": bucket_name}
+
+        config.set_storage_config(storage_config)
+
+        try:
+            from ..storage import ResutilServerStorage
+            ResutilServerStorage(config.storage_config, config.project_name)
+        except FileNotFoundError:
+            print("⚠️ Not logged in yet. Run [bold]resutil login[/bold] after init.")
+        except Exception as e:
+            print("❌ Failed to connect to server.")
             print(f"  [red]{e}[/red]")
             return
 
@@ -377,6 +417,97 @@ def command_rm(args):
     else:
         remove_local(args.EXPERIMENT, config.results_dir)
         remove_remote(args.EXPERIMENT, storage)
+
+
+def command_login(args):
+    # Determine server URL
+    server_url = args.server_url
+    if server_url is None:
+        try:
+            config = Config()
+            config.load()
+            if config.storage_type == "server":
+                server_url = config.storage_config["server_url"]
+            else:
+                print("⚠️ storage_type is not 'server'. Use --server-url to specify the server URL.")
+                return
+        except FileNotFoundError:
+            print("⚠️ No resutil-conf.yaml found. Use --server-url to specify the server URL.")
+            return
+
+    server_url = server_url.rstrip("/")
+
+    # Find a free port for the local callback server
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        port = s.getsockname()[1]
+
+    # Get login URL from server
+    try:
+        import httpx
+        resp = httpx.get(f"{server_url}/auth/login", params={"port": port})
+        resp.raise_for_status()
+        login_data = resp.json()
+        login_url = login_data["login_url"]
+        api_key = login_data.get("api_key")
+    except Exception as e:
+        print(f"❌ Failed to get login URL: {e}")
+        return
+
+    # Store tokens received from callback
+    received_tokens = {}
+
+    class CallbackHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+
+            if parsed.path == "/callback" and "id_token" in params:
+                received_tokens["id_token"] = params["id_token"][0]
+                received_tokens["refresh_token"] = params.get("refresh_token", [""])[0]
+
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(
+                    b"<html><body><h2>Login successful!</h2>"
+                    b"<p>You can close this window and return to the terminal.</p>"
+                    b"</body></html>"
+                )
+            else:
+                self.send_response(400)
+                self.end_headers()
+
+        def log_message(self, format, *args):
+            pass  # Suppress HTTP log output
+
+    print("🔐 Opening browser for login...")
+    webbrowser.open(login_url)
+
+    # Start local server and wait for callback
+    server = HTTPServer(("localhost", port), CallbackHandler)
+    server.timeout = 120  # 2 minutes timeout
+    server.handle_request()
+
+    if not received_tokens.get("id_token"):
+        print("❌ Login failed. No token received.")
+        return
+
+    # Save credentials
+    credentials_path = Path.home() / ".resutil" / "credentials.json"
+    credentials_path.parent.mkdir(parents=True, exist_ok=True)
+
+    creds = {
+        "server_url": server_url,
+        "id_token": received_tokens["id_token"],
+        "refresh_token": received_tokens["refresh_token"],
+        "api_key": api_key,
+    }
+    with credentials_path.open("w") as f:
+        json.dump(creds, f, indent=2)
+    credentials_path.chmod(0o600)
+
+    print("✅ Login successful! Credentials saved to ~/.resutil/credentials.json")
 
 
 def command_comment(args):

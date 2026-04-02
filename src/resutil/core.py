@@ -9,7 +9,7 @@ import shutil
 
 from rich import print
 
-from .storage import GCS, GDrive, Storage
+from .storage import Storage
 from .config_file import Config
 from .exp_file import ExpFile
 from .ex_dir import get_ex_dir_names
@@ -27,6 +27,7 @@ def initialize():
         exit(1)
 
     if config.storage_type == "gcs" or config.storage_type == "gs":
+        from .storage import GCS
         storage = GCS(config.storage_config, config.project_name)
         print("📦 Connected to [bold]Google Cloud Storage[/bold]")
         info = storage.get_info()
@@ -34,10 +35,20 @@ def initialize():
         print(f"  📁 Project dir: [bold]{info['project_dir']}[/bold]")
 
     elif config.storage_type == "gdrive":
+        from .storage import GDrive
         storage = GDrive(config.storage_config, config.project_name)
         print("📦 Connected to [bold]Google Drive[/bold]")
         info = storage.get_info()
         print(f"  📁 Base folder id: [bold]{info['base_folder_id']}[/bold]")
+        print(f"  📁 Project dir: [bold]{info['project_dir']}[/bold]")
+
+    elif config.storage_type == "server":
+        from .storage import ResutilServerStorage
+        storage = ResutilServerStorage(config.storage_config, config.project_name)
+        print("📦 Connected to [bold]Resutil Server[/bold]")
+        info = storage.get_info()
+        print(f"  🌐 Server URL: [bold]{info['server_url']}[/bold]")
+        print(f"  📁 Bucket name: [bold]{info['bucket_name']}[/bold]")
         print(f"  📁 Project dir: [bold]{info['project_dir']}[/bold]")
 
     else:

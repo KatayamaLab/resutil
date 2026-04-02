@@ -42,8 +42,8 @@ class Config:
         self.results_dir = results_dir
 
     def set_storage_type(self, storage_type: str):
-        if storage_type not in ["gs", "gcs", "gdrive"]:
-            raise ValueError("storage_type must be 'local', 'gcs' or 'gdrive'")
+        if storage_type not in ["gs", "gcs", "gdrive", "server"]:
+            raise ValueError("storage_type must be 'gcs', 'gdrive' or 'server'")
         self.storage_type = storage_type
 
     def set_storage_config(self, storage_config):
@@ -58,8 +58,13 @@ class Config:
                 raise ValueError("storage_config must have 'key_file_path' key")
             if "base_folder_id" not in storage_config:
                 raise ValueError("storage_config must have 'base_folder_id' key")
+        elif self.storage_type == "server":
+            if "server_url" not in storage_config:
+                raise ValueError("storage_config must have 'server_url' key")
+            if "bucket_name" not in storage_config:
+                raise ValueError("storage_config must have 'bucket_name' key")
         else:
-            raise ValueError("storage_type must be 'gcs' or 'gdrive'")
+            raise ValueError("storage_type must be 'gcs', 'gdrive' or 'server'")
         self.storage_config = storage_config
 
     def save(self):
