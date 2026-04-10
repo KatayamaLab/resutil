@@ -58,6 +58,7 @@ def _refresh_id_token(refresh_token: str, api_key: str) -> tuple[str, str]:
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
         },
+        timeout=30.0,
     )
     resp.raise_for_status()
     data = resp.json()

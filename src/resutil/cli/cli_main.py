@@ -461,7 +461,7 @@ def command_login(args):
     # Get login URL from server
     try:
         import httpx
-        resp = httpx.get(f"{server_url}/auth/login", params={"port": port})
+        resp = httpx.get(f"{server_url}/auth/login", params={"port": port}, timeout=30.0)
         resp.raise_for_status()
         login_data = resp.json()
         login_url = login_data["login_url"]
@@ -509,6 +509,7 @@ def command_login(args):
             pass  # Suppress HTTP log output
 
     print("🔐 Opening browser for login...")
+    print(f"    If the browser does not open, visit: {login_url}")
     webbrowser.open(login_url)
 
     # Start local server and wait for callback

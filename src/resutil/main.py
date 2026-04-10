@@ -156,15 +156,29 @@ def main(verbose=True):
                 func(resutil_args(ex_dir_path, checkpoint_callback), *args, **kwargs)
                 print("")
                 if not (env_args.no_remote or env_args.debug_mode):
-                    upload(ex_name, config.results_dir, storage)
+                    try:
+                        upload(ex_name, config.results_dir, storage)
+                    except Exception as upload_error:
+                        print("❌ Upload failed:")
+                        print("----------------------------------")
+                        traceback.print_exception(
+                            type(upload_error),
+                            upload_error,
+                            upload_error.__traceback__,
+                        )
+                        print("----------------------------------")
+                        print(
+                            "💡 Your experiment results are saved locally. "
+                            "You can upload them later with 'resutil push'."
+                        )
                 return
 
             # if resutil is interactive, ask the user to confirm before running the function
+            func_succeeded = False
             try:
                 func(resutil_args(ex_dir_path, checkpoint_callback), *args, **kwargs)
                 print("")
-                if not (env_args.no_remote or env_args.debug_mode):
-                    upload(ex_name, config.results_dir, storage)
+                func_succeeded = True
             except KeyboardInterrupt:
                 print("")
                 if user_confirm(
@@ -173,8 +187,8 @@ def main(verbose=True):
                 ):
                     delete_ex_dir(ex_dir_path)
                     print(f"🗑️  Deleted [bold]{ex_dir_path}[/bold]")
-                else:
-                    upload(ex_name, config.results_dir, storage)
+                    print("✅ Done")
+                    return
             except Exception as e:
                 print("")
                 if user_confirm(
@@ -183,12 +197,31 @@ def main(verbose=True):
                 ):
                     delete_ex_dir(ex_dir_path)
                     print(f"🗑️  Deleted [bold]{ex_dir_path}[/bold]")
-                else:
-                    upload(ex_name, config.results_dir, storage)
+                    print("✅ Done")
+                    return
                 print("❌ Please check the error message below:")
                 print("----------------------------------")
                 traceback.print_exception(type(e), e, e.__traceback__)
                 print("----------------------------------")
+
+            # Upload the result (separate from func error handling)
+            if not (env_args.no_remote or env_args.debug_mode):
+                try:
+                    upload(ex_name, config.results_dir, storage)
+                except Exception as upload_error:
+                    print("❌ Upload failed:")
+                    print("----------------------------------")
+                    traceback.print_exception(
+                        type(upload_error),
+                        upload_error,
+                        upload_error.__traceback__,
+                    )
+                    print("----------------------------------")
+                    if func_succeeded:
+                        print(
+                            "💡 Your experiment results are saved locally. "
+                            "You can upload them later with 'resutil push'."
+                        )
             print("✅ Done")
 
         return wrapper
