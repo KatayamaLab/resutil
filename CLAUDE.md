@@ -39,7 +39,8 @@ All backends implement the `Storage` base class (`src/resutil/storage/storage.py
 
 - `main.py` - `@resutil.main()` decorator, experiment lifecycle orchestration
 - `core.py` - Upload/download logic with `ThreadPoolExecutor` for parallel transfers
-- `cli/cli_main.py` - CLI subcommands (init, push, pull, add, list, rm, comment, login)
+- `cli/cli_main.py` - CLI subcommands (init, push, pull, add, list, rm, comment, login, logout) and `--version` flag
+- `cli/interactive.py` - Interactive TUI (launched when `resutil` is run without arguments)
 - `config_file.py` - Reads/writes `resutil-conf.yaml` project config
 - `exp_file.py` - Reads/writes `resutil-exp.yaml` per-experiment metadata
 - `ex_dir.py` - Experiment directory naming (base26 encoding) and management
