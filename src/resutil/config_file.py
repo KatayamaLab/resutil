@@ -32,6 +32,27 @@ class Config:
         self.storage_type: str = conf["storage_type"]
         self.storage_config: str = conf["storage_config"]
 
+        self._apply_env_overrides()
+
+    def _apply_env_overrides(self):
+        storage_type = os.environ.get("RESUTIL_STORAGE_TYPE")
+        if storage_type:
+            self.storage_type = storage_type
+
+        if self.storage_type in ("gs", "gcs"):
+            bucket_name = os.environ.get("RESUTIL_GCS_BUCKET_NAME")
+            if bucket_name:
+                if "bucket_name" in self.storage_config:
+                    self.storage_config["bucket_name"] = bucket_name
+                if "backet_name" in self.storage_config:
+                    self.storage_config["backet_name"] = bucket_name
+                if "bucket_name" not in self.storage_config and "backet_name" not in self.storage_config:
+                    self.storage_config["bucket_name"] = bucket_name
+
+            key_file_path = os.environ.get("RESUTIL_GCS_KEY_FILE_PATH")
+            if key_file_path:
+                self.storage_config["key_file_path"] = key_file_path
+
     def set_project_name(self, project_name: str):
         self.project_name = project_name
 
