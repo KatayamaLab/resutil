@@ -1,6 +1,6 @@
 [project]
 name = "resutil"
-version = "0.2.2"
+version = "0.2.3"
 description = "Resutil is a utility to manage experimental result data obtained from Python projects. It also manages dependency such as codes and input data with result data. Data is synced to the cloud for team sharing and collaboration."
 authors = [{ name = "nobkat", email = "katayama@rs.tus.ac.jp" }]
 dependencies = [
@@ -16,6 +16,7 @@ dependencies = [
     "pyreadline3>=3.5.4; platform_system == 'Windows'",
     "textual>=8.2.1",
     "httpx>=0.27.0",
+    "tzdata>=2024.1 ; sys_platform == 'win32'",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -32,12 +33,14 @@ dev = [
     "black>=24.4.0",
     "pytest-mock>=3.14.0",
     "mypy>=1.10.0",
+    "types-pyyaml>=6.0.12.20261103",
 ]
 
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
+core-metadata-version = "2.4"
 packages = ["src/resutil"]
 
 [project.scripts]
@@ -46,3 +49,13 @@ resutil = 'resutil.cli:main'
 [project.urls]
 Homepage = "https://github.com/KatayamaLab/resutil"
 Issues = "https://github.com/KatayamaLab/resutil/issues"
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[tool.black]
+target-version = ["py310"]
+
+[tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"

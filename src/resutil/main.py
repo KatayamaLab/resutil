@@ -1,28 +1,26 @@
 from functools import wraps
-from datetime import datetime
 from os.path import join
-import sys
-import traceback
-import argparse
-import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from contextlib import nullcontext
+import os
+import sys
 
 from rich import print
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 
-from .utils import user_confirm, parse_result_dirs, verify_comment, EnvArgs
-from .config_file import create_ex_yaml
-from .ex_dir import create_ex_dir, delete_ex_dir, find_unuploaded_ex_dirs
-from .git import GitRepo
-
-from .core import (
-    initialize,
-    upload,
-    upload_all,
-    get_past_comments,
-    download,
+from .utils import (
+    user_confirm,
+    parse_result_dirs,
+    verify_comment,
+    EnvArgs,
+    experiment_now,
 )
+from .config_file import create_ex_yaml
+from .ex_dir import create_ex_dir, delete_ex_dir
+from .git import GitRepo
+from .core import initialize, upload, get_past_comments, download_with_dependency
 
 
 class resutil_args:
@@ -31,198 +29,142 @@ class resutil_args:
         self.checkpoint_callback = checkpoint_callback
 
     def save_checkpoint(self):
-        self.checkpoint_callback()
+        """Return False on disabled/failed upload; never interrupt user computation."""
+        return self.checkpoint_callback()
 
 
 def get_comment(env_args, config):
     if env_args.debug_mode:
-        comment = ""
-    elif env_args.no_interactive:
-        if env_args.comment_env is not None:
-            comment = env_args.comment_env
-        else:
-            comment = ""
-    elif env_args.comment_env is not None:
+        return ""
+    if env_args.comment_env is not None:
         comment = env_args.comment_env
-    else:
-        comments = WordCompleter(get_past_comments(config.results_dir))
-        print("")
-        while True:
-            comment = prompt(
-                f"📝 Input comment for this experiment (press [tab] key to completion): ",
-                completer=comments,
-            )
-            if verify_comment(comment):
-                break
-            print(
-                '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
-            )
-    print("")
-
-    return comment
+        if not verify_comment(comment):
+            raise ValueError("RESUTIL_COMMENT is invalid (maximum 200 UTF-8 bytes).")
+        return comment
+    if env_args.no_interactive:
+        return ""
+    comments = WordCompleter(get_past_comments(config.results_dir))
+    while True:
+        comment = prompt("📝 Input comment for this experiment: ", completer=comments)
+        if verify_comment(comment):
+            return comment
+        print(
+            "⛔️ Invalid comment (maximum 200 UTF-8 bytes; no path separators or control characters)."
+        )
 
 
 def get_env_args():
-    # set interactive mode
-    no_interactive = os.environ.get("RESUTIL_NO_INTERACTIVE") is not None
-    comment_env = os.environ.get("RESUTIL_COMMENT", None)
-    no_remote = os.environ.get("RESUTIL_NO_REMOTE") is not None
-    debug_mode = os.environ.get("RESUTIL_DEBUG") is not None
-    env_args = EnvArgs(
-        comment_env=comment_env,
-        no_interactive=no_interactive,
-        no_remote=no_remote,
-        debug_mode=debug_mode,
+    return EnvArgs(
+        comment_env=os.environ.get("RESUTIL_COMMENT"),
+        no_interactive="RESUTIL_NO_INTERACTIVE" in os.environ,
+        no_remote="RESUTIL_NO_REMOTE" in os.environ or "RESUTIIL_REMOTE" in os.environ,
+        debug_mode="RESUTIL_DEBUG" in os.environ,
     )
 
-    return env_args
 
-
-# Used as a decorator
 def main(verbose=True):
     def main_wrapper(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            print("")
-            print("✨ Runnning your code with [bold]Resutil[/bold]")
-            print("")
-
-            config, storage = initialize()
-            env_args = get_env_args()
-
-            comment = get_comment(env_args, config)
-
-            if env_args.debug_mode:
-                print("🔍 Debug mode is enabled.")
-                print("")
-                ex_name = "_debug"
-                os.makedirs(join(config.results_dir, ex_name), exist_ok=True)
-            else:
-                ex_name = create_ex_dir(
-                    datetime.now(),
-                    comment,
-                    config.results_dir,
-                )
-            ex_dir_path = join(config.results_dir, ex_name)
-
-            # check uncommited files
-            git_repo = GitRepo()
-
-            if git_repo.exist():
-                commit_hash, unstaged_files = git_repo.get_git_info()
-                if len(unstaged_files) > 0:
-                    print("🔍 Unstaged files will be stored in the result dir:")
-                    for file in unstaged_files:
-                        print(f"  - {file}")
-                    git_repo.store_uncomited_to(join(ex_dir_path, "uncommited_files"))
-            else:
-                commit_hash = None
-                unstaged_files = []
-
-            dependencies = parse_result_dirs(sys.argv, config.results_dir)
-
-            create_ex_yaml(
-                ex_dir_path,
-                dependencies,
-                commit_hash=commit_hash,
-                uncommited_files=unstaged_files,
+            env = get_env_args()
+            remote_enabled = not (env.no_remote or env.debug_mode)
+            config, storage = initialize(connect=remote_enabled)
+            comment = get_comment(env, config)
+            now = experiment_now()
+            context = (
+                TemporaryDirectory(prefix="resutil-debug-")
+                if env.debug_mode
+                else nullcontext(None)
             )
-
-            # Check all dependencies exist
-            unexisting_deps = []
-            for dep in dependencies:
-                print(dep)
-                if not dep.exists():
-                    unexisting_deps.append(dep)
-            if len(unexisting_deps) > 0:
-                print(
-                    "🔍 The following dependencies do not exist. They will be downloaded."
+            with context as temp:
+                if temp is not None:
+                    ex_dir_path = temp
+                    ex_name = Path(temp).name
+                else:
+                    ex_name = create_ex_dir(now, comment, config.results_dir)
+                    ex_dir_path = str(Path(config.results_dir) / ex_name)
+                print(f"📁 Experiment directory: {ex_dir_path}")
+                git_repo = GitRepo()
+                commit_hash, files = git_repo.get_git_info(
+                    exclude_paths=[config.results_dir, ex_dir_path]
                 )
-                for dep in unexisting_deps:
-                    print(f"  📁 {dep}")
-                for dep in unexisting_deps:
-                    download(dep.name, config.results_dir, storage)
-                print("")
+                if files:
+                    git_repo.store_uncomited_to(join(ex_dir_path, "uncommited_files"))
+                dependencies = parse_result_dirs(sys.argv, config.results_dir)
+                create_ex_yaml(
+                    ex_dir_path,
+                    dependencies,
+                    commit_hash,
+                    files,
+                    deleted_files=getattr(git_repo, "deleted_files", []),
+                    comment=comment,
+                    started_at=now.isoformat(),
+                )
+                for dependency in dependencies:
+                    if not dependency.is_dir():
+                        if storage is None:
+                            raise FileNotFoundError(
+                                f"Dependency unavailable in offline mode: {dependency}"
+                            )
+                        download_with_dependency(
+                            dependency.name, config.results_dir, storage
+                        )
 
-            # Run the main function
-            print("🚀 Running the main function...")
-
-            def checkpoint_callback():
-                print("📁 Uploading the results up to this point...")
-                upload(ex_name, config.results_dir, storage)
-
-            # if resutil is NOT interactive, run the function and upload the result
-            if env_args.no_interactive:
-                func(resutil_args(ex_dir_path, checkpoint_callback), *args, **kwargs)
-                print("")
-                if not (env_args.no_remote or env_args.debug_mode):
+                def checkpoint_callback():
+                    if not remote_enabled:
+                        return False
                     try:
                         upload(ex_name, config.results_dir, storage)
-                    except Exception as upload_error:
-                        print("❌ Upload failed:")
-                        print("----------------------------------")
-                        traceback.print_exception(
-                            type(upload_error),
-                            upload_error,
-                            upload_error.__traceback__,
-                        )
-                        print("----------------------------------")
+                        return True
+                    except Exception as exc:
                         print(
-                            "💡 Your experiment results are saved locally. "
-                            "You can upload them later with 'resutil push'."
+                            f"⚠️ Checkpoint upload failed: {exc}. Results remain at {ex_dir_path}."
                         )
-                return
+                        return False
 
-            # if resutil is interactive, ask the user to confirm before running the function
-            func_succeeded = False
-            try:
-                func(resutil_args(ex_dir_path, checkpoint_callback), *args, **kwargs)
-                print("")
-                func_succeeded = True
-            except KeyboardInterrupt:
-                print("")
-                if user_confirm(
-                    "🔔 Interrupted by user. Do you want to [bold]delete[/bold] experiment file for trial?",
-                    default="n",
-                ):
-                    delete_ex_dir(ex_dir_path)
-                    print(f"🗑️  Deleted [bold]{ex_dir_path}[/bold]")
-                    print("✅ Done")
-                    return
-            except Exception as e:
-                print("")
-                if user_confirm(
-                    "❌ An Exception has occured. Do you want to [bold]delete[/bold] experiment file for trial?",
-                    default="n",
-                ):
-                    delete_ex_dir(ex_dir_path)
-                    print(f"🗑️  Deleted [bold]{ex_dir_path}[/bold]")
-                    print("✅ Done")
-                    return
-                print("❌ Please check the error message below:")
-                print("----------------------------------")
-                traceback.print_exception(type(e), e, e.__traceback__)
-                print("----------------------------------")
+                def final_upload():
+                    if remote_enabled and Path(ex_dir_path).exists():
+                        try:
+                            upload(ex_name, config.results_dir, storage)
+                        except Exception:
+                            print(
+                                f"❌ Upload failed. Results remain at {ex_dir_path}. Retry with 'resutil push {ex_name}'."
+                            )
+                            raise
 
-            # Upload the result (separate from func error handling)
-            if not (env_args.no_remote or env_args.debug_mode):
+                print("🚀 Running the main function...")
                 try:
-                    upload(ex_name, config.results_dir, storage)
-                except Exception as upload_error:
-                    print("❌ Upload failed:")
-                    print("----------------------------------")
-                    traceback.print_exception(
-                        type(upload_error),
-                        upload_error,
-                        upload_error.__traceback__,
+                    result = func(
+                        resutil_args(ex_dir_path, checkpoint_callback), *args, **kwargs
                     )
-                    print("----------------------------------")
-                    if func_succeeded:
-                        print(
-                            "💡 Your experiment results are saved locally. "
-                            "You can upload them later with 'resutil push'."
-                        )
-            print("✅ Done")
+                except BaseException as exc:
+                    delete = False
+                    if (
+                        not env.no_interactive
+                        and not env.debug_mode
+                        and isinstance(exc, (Exception, KeyboardInterrupt))
+                    ):
+                        try:
+                            delete = user_confirm(
+                                "Execution failed. Delete local experiment?",
+                                default="n",
+                            )
+                        except (EOFError, KeyboardInterrupt):
+                            pass
+                    if delete:
+                        delete_ex_dir(ex_dir_path)
+                    else:
+                        try:
+                            final_upload()
+                        except Exception:
+                            if isinstance(exc, SystemExit) and exc.code in (None, 0):
+                                raise
+                    # Preserve the original exception and nonzero exit status.
+                    raise
+                final_upload()
+                if verbose:
+                    print("✅ Done")
+                return result
 
         return wrapper
 

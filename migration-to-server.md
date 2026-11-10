@@ -54,11 +54,11 @@ resutil push/pull
 resutil login --server-url https://resutil-server-586113954845.asia-northeast1.run.app
 
 # Microsoft アカウントでログイン
-resutil login --provider microsoft --server-url https://resutil-server-586113954845.asia-northeast1.run.app
+resutil login --server-url https://resutil-server-586113954845.asia-northeast1.run.app
 
 # resutil-conf.yaml に server_url が設定済みなら --server-url は省略可能
 resutil login
-resutil login --provider microsoft
+resutil login
 ```
 
 ### 2. プロジェクト初期化
@@ -122,11 +122,11 @@ storage_config:
 ```
 
 - `id_token`: Firebase が発行する JWT（有効期限 1 時間）
-- `refresh_token`: トークン更新用（未実装。期限切れ時は `resutil login` を再実行）
+- `refresh_token`: トークン更新用（API要求前と401応答時に自動更新）
 - ファイルパーミッション: `600`
 
 ## 未実装・今後の課題
 
-- **トークン自動リフレッシュ**: 現状は id_token の期限が切れたら `resutil login` を再実行する必要がある。CLI 側で refresh_token を使った自動更新を実装予定
+- **ログインstate対応**: 新しいCLIを利用する前に docs/server-login-state.patch をサーバーへ適用し、デプロイする。state未対応サーバーへの新規ログインは拒否される。
 - **resutil-server 側のテスト**: サーバー側は 30 テスト通過済み（`uv run pytest -v`）
-- **CLI 側のテスト**: `ResutilServerStorage` の単体テストを追加予定
+- **CLI 側のテスト**: 認証更新、接続先照合、URLエンコード、コールバックstateを回帰テストで検証。

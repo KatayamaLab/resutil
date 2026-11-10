@@ -1,5 +1,9 @@
 import json
 import time
+from threading import RLock
+from urllib.parse import quote, urlsplit, urlunsplit
+
+from ...utils import atomic_write, validate_experiment_name
 from base64 import urlsafe_b64decode
 from os.path import basename
 from pathlib import Path
@@ -19,15 +23,33 @@ def _load_credentials() -> dict:
         raise FileNotFoundError(
             f"Credentials not found at {CREDENTIALS_PATH}. Run 'resutil login' first."
         )
-    with CREDENTIALS_PATH.open() as f:
+    with CREDENTIALS_PATH.open(encoding="utf-8") as f:
         return json.load(f)
 
 
 def _save_credentials(creds: dict) -> None:
-    CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with CREDENTIALS_PATH.open("w") as f:
-        json.dump(creds, f, indent=2)
-    CREDENTIALS_PATH.chmod(0o600)
+    # mkstemp inside atomic_write creates mode 0600 before any token is written.
+    atomic_write(CREDENTIALS_PATH, json.dumps(creds, indent=2))
+
+
+def normalize_server_url(value):
+    parts = urlsplit(value)
+    if (
+        parts.scheme not in ("http", "https")
+        or not parts.hostname
+        or parts.username
+        or parts.password
+        or parts.query
+        or parts.fragment
+    ):
+        raise ValueError("Invalid server URL.")
+    host = parts.hostname.lower()
+    if ":" in host:
+        host = f"[{host}]"
+    port = parts.port
+    if port and (parts.scheme, port) not in (("https", 443), ("http", 80)):
+        host += f":{port}"
+    return urlunsplit((parts.scheme.lower(), host, parts.path.rstrip("/"), "", ""))
 
 
 def _decode_jwt_payload(token: str) -> dict:
@@ -65,13 +87,13 @@ def _refresh_id_token(refresh_token: str, api_key: str) -> tuple[str, str]:
     return data["id_token"], data["refresh_token"]
 
 
-def _ensure_valid_token(creds: dict) -> dict:
+def _ensure_valid_token(creds: dict, force=False) -> dict:
     """Check token expiry and refresh if needed. Returns updated creds."""
     id_token = creds["id_token"]
     refresh_token = creds.get("refresh_token")
     api_key = creds.get("api_key")
 
-    if not _is_token_expired(id_token):
+    if not force and not _is_token_expired(id_token):
         return creds
 
     if not refresh_token:
@@ -92,25 +114,43 @@ def _ensure_valid_token(creds: dict) -> dict:
 
 class ResutilServerStorage(Storage):
     def __init__(self, storage_config: dict, project_name: str):
-        self.server_url = storage_config["server_url"].rstrip("/")
+        self.server_url = normalize_server_url(storage_config["server_url"])
         self.bucket_name = storage_config["bucket_name"]
         self.project_dir = project_name
 
+        self._auth_lock = RLock()
         creds = _load_credentials()
+        if normalize_server_url(creds.get("server_url", "")) != self.server_url:
+            raise PermissionError(
+                "Credentials belong to a different server. Run 'resutil login' for this server."
+            )
         creds = _ensure_valid_token(creds)
+        self._creds = creds
         self.id_token = creds["id_token"]
 
         self._client = httpx.Client(
             base_url=self.server_url,
-            headers={"Authorization": f"Bearer {self.id_token}"},
             timeout=60.0,
         )
 
     def _api_prefix(self) -> str:
-        return f"/api/buckets/{self.bucket_name}/projects/{self.project_dir}/experiments"
+        return f"/api/buckets/{quote(self.bucket_name, safe='')}/projects/{quote(self.project_dir, safe='')}/experiments"
 
     def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
-        resp = self._client.request(method, path, **kwargs)
+        with self._auth_lock:
+            self._creds = _ensure_valid_token(self._creds)
+            self.id_token = self._creds["id_token"]
+            token = self.id_token
+        headers = dict(kwargs.pop("headers", {}))
+        headers["Authorization"] = f"Bearer {token}"
+        resp = self._client.request(method, path, headers=headers, **kwargs)
+        if resp.status_code == 401:
+            with self._auth_lock:
+                if self.id_token == token:
+                    self._creds = _ensure_valid_token(self._creds, force=True)
+                    self.id_token = self._creds["id_token"]
+                headers["Authorization"] = f"Bearer {self.id_token}"
+            resp = self._client.request(method, path, headers=headers, **kwargs)
         if resp.status_code == 401:
             raise PermissionError(
                 "Authentication failed. Your token may have expired. Run 'resutil login' again."
@@ -131,7 +171,9 @@ class ResutilServerStorage(Storage):
         }
 
     def upload_experiment(self, zip_path: str):
-        ex_name = basename(zip_path).removesuffix(".zip")
+        ex_name = quote(
+            validate_experiment_name(basename(zip_path).removesuffix(".zip")), safe=""
+        )
         resp = self._request("POST", f"{self._api_prefix()}/{ex_name}/upload-url")
         signed_url = resp.json()["signed_url"]
 
@@ -145,7 +187,9 @@ class ResutilServerStorage(Storage):
             upload_resp.raise_for_status()
 
     def download_experiment(self, zip_path: str):
-        ex_name = basename(zip_path).removesuffix(".zip")
+        ex_name = quote(
+            validate_experiment_name(basename(zip_path).removesuffix(".zip")), safe=""
+        )
         resp = self._request("POST", f"{self._api_prefix()}/{ex_name}/download-url")
         signed_url = resp.json()["signed_url"]
 
@@ -160,9 +204,14 @@ class ResutilServerStorage(Storage):
         return resp.json()["experiments"]
 
     def remove_experiment(self, ex_name: str):
+        ex_name = quote(validate_experiment_name(ex_name), safe="")
         self._request("DELETE", f"{self._api_prefix()}/{ex_name}")
 
     def change_comment(self, ex_name: str, new_comment: str):
+        from ...ex_dir import commented_name
+
+        commented_name(ex_name, new_comment)
+        ex_name = quote(ex_name, safe="")
         self._request(
             "POST",
             f"{self._api_prefix()}/{ex_name}/rename",
@@ -170,5 +219,6 @@ class ResutilServerStorage(Storage):
         )
 
     def exist_experiment(self, ex_name: str) -> bool:
+        ex_name = quote(validate_experiment_name(ex_name), safe="")
         resp = self._request("GET", f"{self._api_prefix()}/{ex_name}/exists")
         return resp.json()["exists"]

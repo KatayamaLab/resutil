@@ -1,11 +1,8 @@
 import argparse
-import json
 import os
-import socket
 import webbrowser
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from os.path import join
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
@@ -15,11 +12,14 @@ from ..ex_dir import (
     find_undownloaded_ex_dirs,
     find_unuploaded_ex_dirs,
     create_ex_dir,
-    change_comment,
 )
-from ..utils import user_confirm, verify_comment
+from ..utils import (
+    user_confirm,
+    verify_comment,
+    validate_experiment_name,
+    experiment_now,
+)
 from ..config_file import Config, create_ex_yaml
-from ..storage import Storage
 
 from ..core import (
     initialize,
@@ -32,20 +32,23 @@ from ..core import (
     remove_local,
     remove_remote,
     get_ex_dir_names,
+    change_experiment_comment,
 )
-
 
 config_file_path = "resutil-conf.yaml"
 
 
 def get_version():
     from importlib.metadata import version
+
     return version("resutil")
 
 
 def main():
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--version", action="version", version=f"resutil {get_version()}")
+    parser.add_argument(
+        "--version", action="version", version=f"resutil {get_version()}"
+    )
     subparsers = parser.add_subparsers()
 
     # init
@@ -111,10 +114,15 @@ def main():
         "EXPERIMENT",
         nargs="+",
     )
+    parser_rm.add_argument(
+        "-y", "--yes", action="store_true", help="confirm deletion without prompting"
+    )
     parser_rm.set_defaults(handler=command_rm)
 
     # login
-    parser_login = subparsers.add_parser("login", help="Login to resutil server via SSO")
+    parser_login = subparsers.add_parser(
+        "login", help="Login to resutil server via SSO"
+    )
     parser_login.add_argument(
         "--server-url",
         help="resutil server URL (uses resutil-conf.yaml if not specified)",
@@ -141,7 +149,12 @@ def main():
     args = parser.parse_args()
 
     if hasattr(args, "handler"):
-        args.handler(args)
+        try:
+            args.handler(args)
+        except (OSError, ValueError, RuntimeError) as exc:
+            parser.exit(1, f"resutil: {exc}\n")
+        except Exception as exc:
+            parser.exit(1, f"resutil: {exc}\n")
     else:
         # No subcommand → launch interactive TUI
         from .interactive import run_interactive
@@ -215,7 +228,7 @@ def command_init(args):
     # add to .gitignore
     yn = user_confirm(f"Do you want to add .gitignore to {results_dir}?", default="y")
     if yn:
-        with open(os.path.join(results_dir, ".gitignore"), "a") as f:
+        with open(os.path.join(results_dir, ".gitignore"), "a", encoding="utf-8") as f:
             f.write("# Resutil result dir\n")
             f.write("# Automatically added by resutil\n")
             f.write("# Files here are not managed by git\n")
@@ -225,7 +238,7 @@ def command_init(args):
     # set storage type
     while True:
         d = "gcs"
-        print(f"Input storage_type ([bold]gcs[/bold]/gdrive/server): ", end="")
+        print("Input storage_type ([bold]gcs[/bold]/gdrive/server): ", end="")
         s = input()
         storage_type = s if s != "" else "gcs"
         if storage_type in ["gcs", "gdrive", "server"]:
@@ -243,11 +256,11 @@ def command_init(args):
             f"Do you want to add {key_file_path} to .gitignore?", default="y"
         )
         if yn:
-            with open(".gitignore", "a") as f:
+            with open(".gitignore", "a", encoding="utf-8") as f:
                 f.write("\n# Resutil config file\n")
                 f.write(key_file_path + "\n")
 
-        print(f"Input bucket name: ", end="")
+        print("Input bucket name: ", end="")
         bucket_name = input()
 
         storage_config = {"key_file_path": key_file_path, "bucket_name": bucket_name}
@@ -256,6 +269,7 @@ def command_init(args):
 
         try:
             from ..storage import GCS
+
             GCS(config.storage_config, config.project_name)
         except Exception as e:
             print("❌ Failed to connect to storage.")
@@ -273,11 +287,11 @@ def command_init(args):
             f"Do you want to add {key_file_path} to .gitignore?", default="y"
         )
         if yn:
-            with open(".gitignore", "a") as f:
+            with open(".gitignore", "a", encoding="utf-8") as f:
                 f.write("\n# Resutil config file\n")
                 f.write(key_file_path + "\n")
 
-        print(f"Input folder id of base dir: ", end="")
+        print("Input folder id of base dir: ", end="")
         base_dir_id = input()
 
         storage_config = {"key_file_path": key_file_path, "base_folder_id": base_dir_id}
@@ -286,6 +300,7 @@ def command_init(args):
 
         try:
             from ..storage import GDrive
+
             GDrive(config.storage_config, config.project_name)
         except Exception as e:
             print("❌ Failed to connect to storage.")
@@ -299,7 +314,7 @@ def command_init(args):
         s = input()
         server_url = s if s != "" else d
 
-        print(f"Input bucket name: ", end="")
+        print("Input bucket name: ", end="")
         bucket_name = input()
 
         storage_config = {"server_url": server_url, "bucket_name": bucket_name}
@@ -308,6 +323,7 @@ def command_init(args):
 
         try:
             from ..storage import ResutilServerStorage
+
             ResutilServerStorage(config.storage_config, config.project_name)
         except FileNotFoundError:
             print("⚠️ Not logged in yet. Run [bold]resutil login[/bold] after init.")
@@ -353,7 +369,7 @@ def command_push(args):
 def command_pull(args):
     config, storage = initialize()
 
-    if args.experiments or args.experiments is None:
+    if args.experiments:
         for ex_name in args.experiments:
             if args.no_dependency:
                 download(ex_name, config.results_dir, storage)
@@ -378,7 +394,7 @@ def command_pull(args):
 
 
 def command_add(args):
-    config, _ = initialize()
+    config, _ = initialize(connect=False)
 
     if args.comment is None:
         while True:
@@ -386,17 +402,20 @@ def command_add(args):
             if verify_comment(comment):
                 break
             print(
-                '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
+                '⛔️ Comment string is invalid. It should be at most 200 UTF-8 bytes and not contain any of the following characters: \\ / : * ? " < > |'
             )
 
     else:
         comment = args.comment
-        print(f"com: {comment}")
 
+    if not verify_comment(comment):
+        raise ValueError("Invalid comment (maximum 200 UTF-8 bytes).")
     dependency = args.dependency if args.dependency is not None else []
+    for name in dependency:
+        validate_experiment_name(name)
 
     ex_name = create_ex_dir(
-        datetime.now(),
+        experiment_now(),
         comment,
         config.results_dir,
     )
@@ -424,118 +443,104 @@ def command_list(args):
 
 
 def command_rm(args):
-    config, storage = initialize()
-
-    if args.local and not args.remote:
-        remove_local(args.EXPERIMENT, config.results_dir)
-    elif args.remote and not args.local:
+    for name in args.EXPERIMENT:
+        validate_experiment_name(name)
+    local = not args.remote or args.local
+    remote = not args.local or args.remote
+    scope = "local and remote" if local and remote else "local" if local else "remote"
+    if not getattr(args, "yes", False) and not user_confirm(
+        f"Delete {', '.join(args.EXPERIMENT)} ({scope})?", default="n"
+    ):
+        return
+    config, storage = initialize(connect=remote)
+    if remote:
         remove_remote(args.EXPERIMENT, storage)
-    else:
+    if local:
         remove_local(args.EXPERIMENT, config.results_dir)
-        remove_remote(args.EXPERIMENT, storage)
 
 
 def command_login(args):
-    # Determine server URL
+    import secrets
+    import time
+    import httpx
+    from ..storage.server.server import _save_credentials, normalize_server_url
+
     server_url = args.server_url
     if server_url is None:
-        try:
-            config = Config()
-            config.load()
-            if config.storage_type == "server":
-                server_url = config.storage_config["server_url"]
-            else:
-                print("⚠️ storage_type is not 'server'. Use --server-url to specify the server URL.")
-                return
-        except FileNotFoundError:
-            print("⚠️ No resutil-conf.yaml found. Use --server-url to specify the server URL.")
-            return
-
-    server_url = server_url.rstrip("/")
-
-    # Find a free port for the local callback server
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", 0))
-        port = s.getsockname()[1]
-
-    # Get login URL from server
-    try:
-        import httpx
-        resp = httpx.get(f"{server_url}/auth/login", params={"port": port}, timeout=30.0)
-        resp.raise_for_status()
-        login_data = resp.json()
-        login_url = login_data["login_url"]
-        api_key = login_data.get("api_key")
-    except Exception as e:
-        print(f"❌ Failed to get login URL: {e}")
-        return
-
-    # Store tokens received from callback
+        config = Config()
+        config.load()
+        if config.storage_type != "server":
+            raise ValueError("Use --server-url for server login.")
+        server_url = config.storage_config["server_url"]
+    server_url = normalize_server_url(server_url)
+    state = secrets.token_urlsafe(32)
     received_tokens = {}
 
     class CallbackHandler(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(5)
+
         def do_GET(self):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
-
-            if parsed.path == "/callback" and "id_token" in params:
-                received_tokens["id_token"] = params["id_token"][0]
-                received_tokens["refresh_token"] = params.get("refresh_token", [""])[0]
-
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(
-                    "<!DOCTYPE html>"
-                    "<html><head><meta charset='utf-8'><title>resutil</title>"
-                    "<style>"
-                    "body { font-family: sans-serif; display: flex; justify-content: center;"
-                    "  align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }"
-                    ".container { text-align: center; background: white; padding: 2rem 3rem;"
-                    "  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }"
-                    ".success { color: #388e3c; margin-top: 1rem; }"
-                    "</style></head><body>"
-                    "<div class='container'>"
-                    "<h2>resutil</h2>"
-                    "<p class='success'>ログインに成功しました</p>"
-                    "<p>このウィンドウを閉じて、ターミナルに戻ってください。</p>"
-                    "</div></body></html>".encode()
-                )
-            else:
+            valid = (
+                parsed.path == "/callback"
+                and secrets.compare_digest(params.get("state", [""])[0], state)
+                and bool(params.get("id_token", [""])[0])
+            )
+            if not valid:
                 self.send_response(400)
                 self.end_headers()
+                return
+            received_tokens["id_token"] = params["id_token"][0]
+            received_tokens["refresh_token"] = params.get("refresh_token", [""])[0]
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.end_headers()
+            self.wfile.write(
+                "<!doctype html><meta charset='utf-8'><p>Login successful. You may close this window.</p>".encode(
+                    "utf-8"
+                )
+            )
 
         def log_message(self, format, *args):
-            pass  # Suppress HTTP log output
+            pass
 
-    print("🔐 Opening browser for login...")
-    print(f"    If the browser does not open, visit: {login_url}")
-    webbrowser.open(login_url)
-
-    # Start local server and wait for callback
-    server = HTTPServer(("localhost", port), CallbackHandler)
-    server.timeout = 120  # 2 minutes timeout
-    server.handle_request()
-
-    if not received_tokens.get("id_token"):
-        print("❌ Login failed. No token received.")
-        return
-
-    # Save credentials
-    credentials_path = Path.home() / ".resutil" / "credentials.json"
-    credentials_path.parent.mkdir(parents=True, exist_ok=True)
-
-    creds = {
-        "server_url": server_url,
-        "id_token": received_tokens["id_token"],
-        "refresh_token": received_tokens["refresh_token"],
-        "api_key": api_key,
-    }
-    with credentials_path.open("w") as f:
-        json.dump(creds, f, indent=2)
-    credentials_path.chmod(0o600)
-
-    print("✅ Login successful! Credentials saved to ~/.resutil/credentials.json")
+    # Bind and listen before opening the browser; let the OS choose the port.
+    with HTTPServer(("localhost", 0), CallbackHandler) as server:
+        server.timeout = 1
+        resp = httpx.get(
+            f"{server_url}/auth/login",
+            params={"port": server.server_port, "state": state},
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        login_url = data["login_url"]
+        # Explicitly require state round-tripping; never fall back to accepting unbound tokens.
+        if parse_qs(urlparse(login_url).query).get("state") != [state]:
+            raise RuntimeError(
+                "Server does not support login state. Apply docs/server-login-state.patch to resutil-server and deploy it first."
+            )
+        print(f"🔐 Opening browser for login: {login_url}")
+        webbrowser.open(login_url)
+        deadline = time.monotonic() + 120
+        while not received_tokens and time.monotonic() < deadline:
+            server.handle_request()
+    if not received_tokens:
+        raise TimeoutError("Login failed: no valid callback within 120 seconds.")
+    _save_credentials(
+        {
+            "server_url": server_url,
+            "id_token": received_tokens["id_token"],
+            "refresh_token": received_tokens["refresh_token"],
+            "api_key": data.get("api_key"),
+        }
+    )
+    print("✅ Login successful!")
 
 
 def command_logout(args):
@@ -549,34 +554,7 @@ def command_logout(args):
 
 def command_comment(args):
     config, storage = initialize()
-
-    ex_name = args.EXPERIMENT
-    comment = args.NEWCOMMENT
-
-    while True:
-        if verify_comment(comment):
-            break
-        print(
-            '⛔️ Comment string is invalid. It should be less than 200 characters and not contain any of the following characters: \\ / : * ? " < > |'
-        )
-        comment = input("📝 Input comment for this experiment: ")
-
-    ex_names_remote = storage.get_all_experiment_names()
-    ex_names_local = os.listdir(config.results_dir)
-
-    exist_local = ex_name in ex_names_local
-    exist_remote = ex_name in ex_names_remote
-
-    new_ex_name = f"{ex_name.split('_')[0]}_{ex_name.split('_')[1]}_{comment}"
-
-    if not exist_local and not exist_remote:
-        print(f"ℹ️ {ex_name} does not exist")
-        return
-    if exist_local:
-        new_ex_name = change_comment(config.results_dir, ex_name, comment)
-        # rename directory
-        print(f"ℹ️ local experiment directory has been changed to {new_ex_name}.")
-    if exist_remote:
-        storage.change_comment(ex_name, comment)
-
-    print(f"✅ Renamed [bold]{ex_name}[/bold] to [bold]{new_ex_name}[/bold]")
+    new_name = change_experiment_comment(
+        config.results_dir, args.EXPERIMENT, args.NEWCOMMENT, storage
+    )
+    print(f"✅ Renamed {args.EXPERIMENT} to {new_name}")

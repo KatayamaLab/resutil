@@ -1,17 +1,18 @@
-from os.path import basename, normpath
-from os import makedirs
-from concurrent.futures import ThreadPoolExecutor, Future
+from os.path import basename
 
 from google.cloud import storage
 from google.oauth2 import service_account
 
 from ..storage import Storage
+from ...ex_dir import commented_name
 
 
 class GCS(Storage):
     def __init__(self, storage_config: dict, project_name: str):
         key_file_path = storage_config["key_file_path"]
-        bucket_name = storage_config.get("bucket_name") or storage_config.get("backet_name")
+        bucket_name = storage_config.get("bucket_name") or storage_config.get(
+            "backet_name"
+        )
         try:
             credentials = service_account.Credentials.from_service_account_file(
                 key_file_path
@@ -26,16 +27,13 @@ class GCS(Storage):
 
         self.max_workers = 10
 
-    def get_info(self) -> tuple[str, str, str]:
+    def get_info(self) -> dict:
         return {
             "project_dir": self.project_dir,
             "bucket_name": self.bucket_name,
         }
 
     def upload_experiment(self, zip_path: str):
-        blob = self.client.bucket(self.bucket_name).blob(
-            f"{self.project_dir}/{basename(zip_path)}"
-        )
         blob = self.client.bucket(self.bucket_name).blob(
             f"{self.project_dir}/{basename(zip_path)}"
         )
@@ -49,7 +47,12 @@ class GCS(Storage):
 
     def get_all_experiment_names(self) -> list[str]:
         blobs = self.client.list_blobs(self.bucket_name, prefix=self.project_dir + "/")
-        return [p.name.split("/")[-1][:-4] for p in blobs]
+        return [
+            p.name[len(self.project_dir) + 1 : -4]
+            for p in blobs
+            if p.name.endswith(".zip")
+            and "/" not in p.name[len(self.project_dir) + 1 :]
+        ]
 
     def remove_experiment(self, ex_name: str):
         blob = self.client.bucket(self.bucket_name).blob(
@@ -58,7 +61,11 @@ class GCS(Storage):
         blob.delete()
 
     def change_comment(self, ex_name, new_comment):
-        new_ex_name = f"{ex_name.split('_')[0]}_{ex_name.split('_')[1]}_{new_comment}"
+        new_ex_name = commented_name(ex_name, new_comment)
+        if new_ex_name == ex_name:
+            return
+        if self.exist_experiment(new_ex_name):
+            raise FileExistsError(new_ex_name)
         old_name = self.project_dir + "/" + ex_name + ".zip"
         new_name = self.project_dir + "/" + new_ex_name + ".zip"
         old_blob = self.client.bucket(self.bucket_name).blob(old_name)

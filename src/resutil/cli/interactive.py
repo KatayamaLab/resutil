@@ -31,17 +31,18 @@ from ..core import (
     get_ex_dir_names,
     remove_local,
     upload_with_dependency,
+    change_experiment_comment,
 )
 from ..ex_dir import (
-    change_comment,
     create_ex_dir,
 )
-from ..utils import verify_comment
-
+from ..utils import verify_comment, experiment_now
+from ..sync import is_synced
 
 # ---------------------------------------------------------------------------
 # Data helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_experiment(name: str) -> dict:
     """Parse an experiment directory name into parts."""
@@ -67,10 +68,10 @@ def _parse_experiment(name: str) -> dict:
     }
 
 
-
 # ---------------------------------------------------------------------------
 # Confirm Screen
 # ---------------------------------------------------------------------------
+
 
 class ConfirmScreen(ModalScreen[bool]):
     """Simple yes/no confirmation dialog."""
@@ -127,8 +128,14 @@ class ConfirmScreen(ModalScreen[bool]):
             for d in self.details:
                 yield Label(f"  {d}", classes="confirm-body")
             yield Label("")
-            yield Label("  Yes, delete", id="confirm-yes", classes="confirm-btn confirm-yes")
-            yield Label("▸ No, cancel", id="confirm-no", classes="confirm-btn confirm-no highlighted")
+            yield Label(
+                "  Yes, delete", id="confirm-yes", classes="confirm-btn confirm-yes"
+            )
+            yield Label(
+                "▸ No, cancel",
+                id="confirm-no",
+                classes="confirm-btn confirm-no highlighted",
+            )
 
     def _update_highlight(self) -> None:
         yes_w = self.query_one("#confirm-yes", Label)
@@ -162,6 +169,7 @@ class ConfirmScreen(ModalScreen[bool]):
 # Comment Input Screen
 # ---------------------------------------------------------------------------
 
+
 class CommentInputScreen(ModalScreen[Optional[str]]):
     """Input a new comment."""
 
@@ -194,7 +202,11 @@ class CommentInputScreen(ModalScreen[Optional[str]]):
     def compose(self) -> ComposeResult:
         with Vertical(id="comment-dialog"):
             yield Label("Change Comment", classes="comment-title")
-            yield Input(value=self.current_comment, placeholder="Enter new comment", id="comment-input")
+            yield Input(
+                value=self.current_comment,
+                placeholder="Enter new comment",
+                id="comment-input",
+            )
             yield Label("Enter: confirm  Esc: cancel", classes="comment-hint")
 
     def on_mount(self) -> None:
@@ -206,7 +218,10 @@ class CommentInputScreen(ModalScreen[Optional[str]]):
         if value and verify_comment(value):
             self.dismiss(value)
         elif value:
-            self.notify("Invalid comment (max 200 chars, no special chars)", severity="error")
+            self.notify(
+                "Invalid comment (max 200 UTF-8 bytes, no path separators or control characters)",
+                severity="error",
+            )
         else:
             self.dismiss(None)
 
@@ -219,6 +234,7 @@ class CommentInputScreen(ModalScreen[Optional[str]]):
 # ---------------------------------------------------------------------------
 # New Experiment Screen
 # ---------------------------------------------------------------------------
+
 
 class NewExperimentScreen(ModalScreen[Optional[str]]):
     """Create a new experiment."""
@@ -249,7 +265,9 @@ class NewExperimentScreen(ModalScreen[Optional[str]]):
     def compose(self) -> ComposeResult:
         with Vertical(id="new-exp-dialog"):
             yield Label("New Experiment", classes="new-exp-title")
-            yield Input(placeholder="Enter comment for new experiment", id="new-exp-input")
+            yield Input(
+                placeholder="Enter comment for new experiment", id="new-exp-input"
+            )
             yield Label("Enter: create  Esc: cancel", classes="new-exp-hint")
 
     def on_mount(self) -> None:
@@ -261,7 +279,10 @@ class NewExperimentScreen(ModalScreen[Optional[str]]):
         if verify_comment(value):
             self.dismiss(value)
         else:
-            self.notify("Invalid comment (max 200 chars, no special chars)", severity="error")
+            self.notify(
+                "Invalid comment (max 200 UTF-8 bytes, no path separators or control characters)",
+                severity="error",
+            )
 
     def on_key(self, event) -> None:
         if event.key == "escape":
@@ -272,6 +293,7 @@ class NewExperimentScreen(ModalScreen[Optional[str]]):
 # ---------------------------------------------------------------------------
 # Help Screen
 # ---------------------------------------------------------------------------
+
 
 class HelpScreen(ModalScreen[Optional[str]]):
     """Keyboard shortcuts help."""
@@ -334,6 +356,7 @@ class HelpScreen(ModalScreen[Optional[str]]):
 # ---------------------------------------------------------------------------
 # Main App
 # ---------------------------------------------------------------------------
+
 
 class ResutilApp(App):
     """Resutil interactive experiment manager."""
@@ -401,28 +424,34 @@ class ResutilApp(App):
 
     def __init__(self, config: Config, storage):
         super().__init__()
-        self.register_theme(Theme(
-            name="resutil-light",
-            dark=False,
-            primary="#004578",
-            secondary="#0178D4",
-            background="#FFFFFF",
-            surface="#F5F5F5",
-            panel="#EEEEEE",
-        ))
-        self.register_theme(Theme(
-            name="resutil-dark",
-            dark=True,
-            primary="#0178D4",
-            secondary="#004578",
-            background="#1E1E1E",
-            surface="#2D2D2D",
-            panel="#363636",
-        ))
+        self.register_theme(
+            Theme(
+                name="resutil-light",
+                dark=False,
+                primary="#004578",
+                secondary="#0178D4",
+                background="#FFFFFF",
+                surface="#F5F5F5",
+                panel="#EEEEEE",
+            )
+        )
+        self.register_theme(
+            Theme(
+                name="resutil-dark",
+                dark=True,
+                primary="#0178D4",
+                secondary="#004578",
+                background="#1E1E1E",
+                surface="#2D2D2D",
+                panel="#363636",
+            )
+        )
         self.config = config
         self.storage = storage
         self._local_names: set[str] = set()
         self._remote_names: set[str] = set()
+        self._remote_available = False
+        self._dirty_names: set[str] = set()
         self._all_experiments: list[str] = []
         self._selected: set[str] = set()
         self._wide_mode: bool = True
@@ -447,6 +476,7 @@ class ResutilApp(App):
     def on_mount(self) -> None:
         self.theme = self._detect_theme()
         from importlib.metadata import version
+
         self.sub_title = f"{self.config.project_name} — v{version('resutil')}"
         self._wide_mode = self.size.width >= 100
         self._refresh_data()
@@ -459,9 +489,12 @@ class ResutilApp(App):
         # macOS: check system appearance (most reliable on macOS)
         try:
             import subprocess
+
             result = subprocess.run(
                 ["defaults", "read", "-globalDomain", "AppleInterfaceStyle"],
-                capture_output=True, text=True, timeout=1,
+                capture_output=True,
+                text=True,
+                timeout=1,
             )
             # returncode == 0 means "Dark" value exists → dark mode
             # returncode != 0 means key not found → light mode
@@ -493,10 +526,21 @@ class ResutilApp(App):
 
     def _refresh_data(self) -> None:
         self._local_names = set(get_ex_dir_names(self.config.results_dir))
-        self._remote_names = set(self.storage.get_all_experiment_names())
-        self._all_experiments = sorted(
-            list(self._local_names | self._remote_names)
-        )
+        try:
+            self._remote_names = set(self.storage.get_all_experiment_names())
+            self._remote_available = True
+            self._dirty_names = {
+                name
+                for name in self._local_names
+                if name not in self._remote_names
+                or not is_synced(self.config.results_dir, name, self.storage)
+            }
+        except Exception as exc:
+            self._remote_available = False
+            self.notify(
+                f"Could not refresh remote experiments: {exc}", severity="error"
+            )
+        self._all_experiments = sorted(list(self._local_names | self._remote_names))
 
     def _filtered_experiments(self) -> list[str]:
         if not self.filter_text:
@@ -549,11 +593,16 @@ class ResutilApp(App):
         count = len(filtered)
         total = len(self._all_experiments)
         from importlib.metadata import version
+
         ver = version("resutil")
         if self.filter_text:
-            self.sub_title = f"{self.config.project_name} — v{ver} — {count}/{total} filtered"
+            self.sub_title = (
+                f"{self.config.project_name} — v{ver} — {count}/{total} filtered"
+            )
         else:
-            self.sub_title = f"{self.config.project_name} — v{ver} — {total} experiments"
+            self.sub_title = (
+                f"{self.config.project_name} — v{ver} — {total} experiments"
+            )
 
     def _restore_table_state(self, target_row: int | None, scroll_y: float) -> None:
         table = self.query_one("#exp-table", DataTable)
@@ -573,8 +622,14 @@ class ResutilApp(App):
 
         sel_mark = "[yellow]●[/]" if selected else " "
         local_mark = "[green]✔[/]" if has_local else "[dim]─[/]"
-        remote_mark = "[green]✔[/]" if (has_remote and has_local) else "[cyan]✔[/]" if has_remote else "[dim]─[/]"
+        remote_mark = (
+            "[green]✔[/]"
+            if (has_remote and has_local)
+            else "[cyan]✔[/]" if has_remote else "[dim]─[/]"
+        )
 
+        if has_local and name in self._dirty_names and has_remote:
+            remote_mark = "[yellow]↻[/]"
         parsed = _parse_experiment(name)
 
         if self._wide_mode:
@@ -645,7 +700,6 @@ class ResutilApp(App):
             self._selected.add(name)
         self._build_table()
 
-
     # -- Actions ------------------------------------------------------------
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
@@ -663,9 +717,17 @@ class ResutilApp(App):
                 subprocess.run(["pbcopy"], input=text.encode(), check=True)
             elif system == "Linux":
                 try:
-                    subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=True)
+                    subprocess.run(
+                        ["xclip", "-selection", "clipboard"],
+                        input=text.encode(),
+                        check=True,
+                    )
                 except FileNotFoundError:
-                    subprocess.run(["xsel", "--clipboard", "--input"], input=text.encode(), check=True)
+                    subprocess.run(
+                        ["xsel", "--clipboard", "--input"],
+                        input=text.encode(),
+                        check=True,
+                    )
             elif system == "Windows":
                 subprocess.run(["clip"], input=text.encode(), check=True)
         except Exception:
@@ -675,7 +737,7 @@ class ResutilApp(App):
     def _do_push(self, names: list[str]) -> None:
         try:
             for name in names:
-                if name in self._local_names and name not in self._remote_names:
+                if name in self._local_names and name in self._dirty_names:
                     self.notify(f"Pushing {name}...")
                     upload_with_dependency(name, self.config.results_dir, self.storage)
             self.app.call_from_thread(self._after_operation, "Push complete")
@@ -688,7 +750,9 @@ class ResutilApp(App):
             for name in names:
                 if name not in self._local_names and name in self._remote_names:
                     self.notify(f"Pulling {name}...")
-                    download_with_dependency(name, self.config.results_dir, self.storage)
+                    download_with_dependency(
+                        name, self.config.results_dir, self.storage
+                    )
             self.app.call_from_thread(self._after_operation, "Pull complete")
         except Exception as e:
             self.app.call_from_thread(self._after_error, f"Pull failed: {e}")
@@ -708,16 +772,12 @@ class ResutilApp(App):
     @work(thread=True)
     def _apply_comment_worker(self, name: str, new_comment: str) -> None:
         try:
-            has_local = name in self._local_names
-            has_remote = name in self._remote_names
-            # Compute new name for cursor tracking
-            parts = name.split("_", 2)
-            new_name = f"{parts[0]}_{parts[1]}_{new_comment}"
-            if has_local:
-                change_comment(self.config.results_dir, name, new_comment)
-            if has_remote:
-                self.storage.change_comment(name, new_comment)
-            self.app.call_from_thread(self._after_operation_with_cursor, "Comment changed", new_name)
+            new_name = change_experiment_comment(
+                self.config.results_dir, name, new_comment, self.storage
+            )
+            self.app.call_from_thread(
+                self._after_operation_with_cursor, "Comment changed", new_name
+            )
         except Exception as e:
             self.app.call_from_thread(self._after_error, f"Comment change failed: {e}")
 
@@ -760,7 +820,9 @@ class ResutilApp(App):
 
             remove_local(names, self.config.results_dir)
             if cursor_hint and cursor_hint not in removed:
-                self.app.call_from_thread(self._after_operation_with_cursor, "Remove complete", cursor_hint)
+                self.app.call_from_thread(
+                    self._after_operation_with_cursor, "Remove complete", cursor_hint
+                )
             else:
                 self.app.call_from_thread(self._after_operation, "Remove complete")
         except Exception as e:
@@ -779,8 +841,7 @@ class ResutilApp(App):
         self.notify(message, severity="information")
 
     def _after_error(self, message: str) -> None:
-        self._refresh_data()
-        self._build_table()
+        # Error reporting must not make another network request.
         self.notify(message, severity="error")
 
     # -- New experiment -----------------------------------------------------
@@ -799,7 +860,7 @@ class ResutilApp(App):
     @work(thread=True)
     def _create_experiment_worker(self, comment: str) -> None:
         try:
-            ex_name = create_ex_dir(datetime.now(), comment, self.config.results_dir)
+            ex_name = create_ex_dir(experiment_now(), comment, self.config.results_dir)
             ex_dir_path = join(self.config.results_dir, ex_name)
             create_ex_yaml(ex_dir_path, [])
             self.app.call_from_thread(self._after_new_experiment, f"Created: {ex_name}")
@@ -832,8 +893,16 @@ class ResutilApp(App):
         names = self._get_target_names()
         if not names:
             return
-        pushable = [n for n in names if n in self._local_names and n not in self._remote_names]
-        pullable = [n for n in names if n not in self._local_names and n in self._remote_names]
+        self._refresh_data()
+        if not self._remote_available:
+            self.notify(
+                "Remote is unavailable; retry when connected.", severity="error"
+            )
+            return
+        pushable = [n for n in names if n in self._dirty_names]
+        pullable = [
+            n for n in names if n not in self._local_names and n in self._remote_names
+        ]
         if pushable:
             self._do_push(pushable)
         elif pullable:
@@ -862,57 +931,36 @@ class ResutilApp(App):
 # Entry point
 # ---------------------------------------------------------------------------
 
-def run_interactive():
-    """Launch the interactive TUI. Returns True if launched, False if not initialized."""
-    from rich import print as rprint
 
+def run_interactive():
+    """Launch the TUI; only an absent config triggers initialization."""
+    from rich import print as rprint
+    from ..core import initialize
+
+    config = Config()
     try:
-        config = Config()
         config.load()
     except FileNotFoundError:
         return False
+    try:
+        config, storage = initialize()
+    except (PermissionError, FileNotFoundError):
+        if config.storage_type != "server":
+            rprint("[red]Storage credentials are unavailable.[/red]")
+            return True
+        from .cli_main import command_login
+        from types import SimpleNamespace
 
-    from ..storage import GCS, GDrive, ResutilServerStorage
-
-    if config.storage_type in ("gcs", "gs"):
-        storage = GCS(config.storage_config, config.project_name)
-    elif config.storage_type == "gdrive":
-        storage = GDrive(config.storage_config, config.project_name)
-    elif config.storage_type == "server":
         try:
-            storage = ResutilServerStorage(config.storage_config, config.project_name)
-        except FileNotFoundError:
-            rprint("🔐 Not logged in. Starting login...")
-            from .cli_main import command_login
-
-            class _Args:
-                server_url = None
-            command_login(_Args())
-
-            # Retry after login
-            try:
-                storage = ResutilServerStorage(config.storage_config, config.project_name)
-            except FileNotFoundError:
-                rprint("[red]❌ Login failed. Run 'resutil login' manually.[/red]")
-                return True
-        except PermissionError as e:
-            rprint(f"🔐 {e}")
-            rprint("Re-authenticating...")
-            from .cli_main import command_login
-
-            class _Args:
-                server_url = None
-            command_login(_Args())
-
-            try:
-                storage = ResutilServerStorage(config.storage_config, config.project_name)
-            except Exception as e2:
-                rprint(f"[red]❌ Authentication failed: {e2}[/red]")
-                return True
-    else:
-        rprint(f"Unknown storage type: {config.storage_type}")
-        return False
-
-    app = ResutilApp(config, storage)
-    app.run()
+            command_login(
+                SimpleNamespace(server_url=config.storage_config["server_url"])
+            )
+            config, storage = initialize()
+        except Exception as exc:
+            rprint(f"[red]Authentication failed: {exc}[/red]")
+            return True
+    except Exception as exc:
+        rprint(f"[red]Cannot connect to storage: {exc}[/red]")
+        return True
+    ResutilApp(config, storage).run()
     return True

@@ -1,28 +1,66 @@
-from datetime import datetime
-import os
+from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
+import yaml
 import pytest
 
 from resutil.ex_dir import create_ex_dir, delete_ex_dir, change_comment
+from conftest import A, B
 
 
-def test_create_ex_dir(mocker):
-    mocker.patch("os.makedirs", return_value=None)
-    path = create_ex_dir(datetime(2024, 1, 1, 0, 0, 0, 0), "test", "results")
-    assert path == "aaaaaa_20240101T000000_test"
+def test_create_and_collision(tmp_path):
+    now = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    with ThreadPoolExecutor(4) as pool:
+        names = list(
+            pool.map(lambda _: create_ex_dir(now, "test", str(tmp_path)), range(4))
+        )
+    assert len(set(names)) == 4
+    assert "aaaaaa_20240101T000000_test" in names
 
 
-def test_delete_ex_dir(mocker):
-    mocker.patch("shutil.rmtree", return_value=None)
-    assert delete_ex_dir("results/aaaaaa_20240101T000000_test")
-
-    # check if raise error
-    with pytest.raises(ValueError) as exec_info:
-        delete_ex_dir("aaa")
-    assert str(exec_info.value) == "aaa does not exist"
+def test_delete(tmp_path):
+    path = tmp_path / A
+    path.mkdir()
+    assert delete_ex_dir(path)
+    with pytest.raises(FileNotFoundError):
+        delete_ex_dir(path)
 
 
-def test_change_comment_():
-    os.makedirs("results/aaaaaaa_20240101T000000_test")
-    new_ex_name = change_comment("results", "aaaaaaa_20240101T000000_test", "new_test")
-    assert new_ex_name == "aaaaaaa_20240101T000000_new_test"
-    os.rmdir("results/aaaaaaa_20240101T000000_new_test")
+def test_comment_updates_dependencies(experiment):
+    a = experiment(A)
+    b = experiment(B, [str(a)])
+    new = change_comment(a.parent, A, "new_comment")
+    assert new.endswith("_new_comment")
+    assert not a.exists()
+    metadata = yaml.safe_load((b / "resutil-exp.yaml").read_text(encoding="utf-8"))
+    assert metadata["dependency"] == [new]
+    own = yaml.safe_load(
+        (a.parent / new / "resutil-exp.yaml").read_text(encoding="utf-8")
+    )
+    assert own["result_dir"] == new
+
+
+def test_rename_rolls_back_on_metadata_failure(experiment, monkeypatch):
+    from resutil import ex_dir
+
+    a = experiment(A)
+    b = experiment(B, [A])
+    originals = {
+        path: path.read_text(encoding="utf-8")
+        for path in (a / "resutil-exp.yaml", b / "resutil-exp.yaml")
+    }
+    writer = ex_dir.write_yaml
+    calls = []
+
+    def fail_second(path, data):
+        calls.append(path)
+        if len(calls) == 2:
+            raise OSError("disk error")
+        writer(path, data)
+
+    monkeypatch.setattr(ex_dir, "write_yaml", fail_second)
+    with pytest.raises(OSError):
+        change_comment(a.parent, A, "new")
+    assert a.is_dir()
+    assert all(
+        path.read_text(encoding="utf-8") == text for path, text in originals.items()
+    )

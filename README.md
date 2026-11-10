@@ -160,9 +160,9 @@ storage_config:
 
 ### `resutil push`
 
-The `resutil push` command is used to upload experimental data to the cloud that does not exist in the cloud result directory.
+The `resutil push EXPERIMENT` command uploads a local experiment, replacing its remote archive if it exists. `resutil push --all` uploads new or locally modified experiments.
 
-`resutil push [exp_name]` uploads experiment a specific directory to the cloud. Depending directorys included in `exp-config.yaml` are automtically uploaded. `--no-dependency` option restrain automatic dependency upload.
+`resutil push EXPERIMENT` uploads the specified experiment and any new or modified local dependencies listed in `resutil-exp.yaml`. Pass `--no-dependency` to upload only the specified experiment.
 
 `resutil push  --all` will upload all experimental data to the cloud.
 
@@ -172,7 +172,7 @@ This is useful for keeping your local data up-to-date with the data stored in th
 
 The `resutil pull` command is used to download a specific experimental data from the cloud that does not exist in the local result directory.
 
-`resutil pull [exp_name]` downloads experiment directory from cloud. Depending directorys included in `exp-config.yaml` are automtically downlowded. `--no-dependency` option restrain automatic dependency download.
+`resutil pull [exp_name]` downloads experiment directory from cloud. Depending directorys included in `resutil-exp.yaml` are automtically downlowded. `--no-dependency` option restrain automatic dependency download.
 
 `resutil pull --all` will download all experimental data from the cloud that is not currently in your local result directory.
 
@@ -196,7 +196,7 @@ The `resutil rm` command removes experiments. You can use it as follows: resutil
 
 ### `resutil comment` **EXPERIMENTAL**
 
-`resutil comment [EXPERIMENT] [COMMENT]` adds or modifies a comment following the timestamp in the experiment name. Both local and cloud experiment names will change if they exist. Note that Resutil regards a different experiment name as a different experiment, so this does not affect the name of the same experiment other users have already pulled.
+`resutil comment [EXPERIMENT] [COMMENT]` adds or modifies a comment following the timestamp in the experiment name. Both local and cloud experiment names will change if they exist. Dependency references and the experiment metadata are updated; remote archives are inspected to find references. Note that Resutil regards a different experiment name as a different experiment, so this does not affect the name of the same experiment other users have already pulled.
 
 ### `resutil login`
 
@@ -218,7 +218,7 @@ When running code that integrates Resutil, you can use the following environment
 
 `RESUTIL_NO_INTERACTIVE` Enables non-interactive mode. This prevents any user prompts during execution. This is useful when running as a batch job. If `RESUTIL_COMMENT` is not specified, no comment will be added to the experiment directory.
 
-`RESUTIIL_REMOTE` Suppresses uploading results to cloud storage.
+`RESUTIL_NO_REMOTE` Suppresses uploading results to cloud storage.
 
 `RESUTIL_DEBUG` Enables debug mode where a temporary directory is used as experiment directory. The temporary directory will not be uploaded to cloud storage.
 
@@ -276,3 +276,24 @@ dependency: Dependencies (automatically extracted from directories in the comman
     ## Bug Fixed
     - Fix a bug resuitl does not works properly when git is not initialized
     ```
+
+
+### Reliability and configuration
+
+- `resutil rm` asks for confirmation; pass `--yes` for scripts. Without `--local`
+  or `--remote`, both copies are deleted.
+- `RESUTIL_NO_REMOTE` disables storage authentication and uploads, including checkpoints.
+  The old spelling `RESUTIIL_REMOTE` is accepted as an alias.
+- `RESUTIL_DEBUG` uses a unique temporary directory, cleans it up after execution,
+  and skips storage authentication and uploads.
+- `RESUTIL_TIMEZONE=Asia/Tokyo` selects an IANA time zone. Metadata records the UTC offset.
+- `RESUTIL_STORAGE_TYPE`, `RESUTIL_GCS_BUCKET_NAME` and `RESUTIL_GCS_KEY_FILE_PATH`
+  override the corresponding storage settings.
+- Configuration paths resolve relative to `resutil-conf.yaml`; the working directory is preserved.
+- Comments accept up to 200 UTF-8 bytes. Directory-name collisions receive a unique suffix.
+- `params.save_checkpoint()` returns `False` when disabled or failed. It does not interrupt
+  computation. A failed final upload raises an error; retry with `resutil push EXPERIMENT`.
+- New or modified local data is detected using `results/.resutil-sync.json`.
+  Missing receipts trigger a conservative upload; remote-only edits are not compared.
+- The server login endpoint must echo the login `state` through its sign-in page
+  and callback. See [server compatibility](docs/review-fixes.md) and the included server patch.

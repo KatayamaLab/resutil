@@ -1,7 +1,9 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Iterable
+
+from .utils import normalize_dependency, write_yaml
 
 
 import yaml
@@ -19,20 +21,25 @@ class Config:
             config_file_path = Path(parent, CONFIG_FILE_NAME)
             if config_file_path.exists():
                 self.config_file_dir = parent
-                os.chdir(parent)
                 break
         try:
-            with config_file_path.open("r") as f:
+            with config_file_path.open("r", encoding="utf-8") as f:
                 conf = yaml.safe_load(f)
         except FileNotFoundError:
             raise FileNotFoundError(f"config file {config_file_path} does not exist.")
 
         self.project_name: str = conf["project_name"]
-        self.results_dir: str = conf["results_dir"]
+        self.results_dir: str = str(
+            (self.config_file_dir / conf["results_dir"]).resolve()
+        )
         self.storage_type: str = conf["storage_type"]
-        self.storage_config: str = conf["storage_config"]
+        self.storage_config: dict = dict(conf["storage_config"])
 
         self._apply_env_overrides()
+        if self.storage_config.get("key_file_path"):
+            self.storage_config["key_file_path"] = str(
+                (self.config_file_dir / self.storage_config["key_file_path"]).resolve()
+            )
 
     def _apply_env_overrides(self):
         storage_type = os.environ.get("RESUTIL_STORAGE_TYPE")
@@ -46,7 +53,10 @@ class Config:
                     self.storage_config["bucket_name"] = bucket_name
                 if "backet_name" in self.storage_config:
                     self.storage_config["backet_name"] = bucket_name
-                if "bucket_name" not in self.storage_config and "backet_name" not in self.storage_config:
+                if (
+                    "bucket_name" not in self.storage_config
+                    and "backet_name" not in self.storage_config
+                ):
                     self.storage_config["bucket_name"] = bucket_name
 
             key_file_path = os.environ.get("RESUTIL_GCS_KEY_FILE_PATH")
@@ -72,7 +82,10 @@ class Config:
         if self.storage_type == "gs" or self.storage_type == "gcs":
             if "key_file_path" not in storage_config:
                 raise ValueError("storage_config must have 'key_file_path' key")
-            if "bucket_name" not in storage_config and "backet_name" not in storage_config:
+            if (
+                "bucket_name" not in storage_config
+                and "backet_name" not in storage_config
+            ):
                 raise ValueError("storage_config must have 'bucket_name' key")
         elif self.storage_type == "gdrive":
             if "key_file_path" not in storage_config:
@@ -95,25 +108,33 @@ class Config:
             "storage_type": self.storage_type,
             "storage_config": self.storage_config,
         }
-        with open(CONFIG_FILE_NAME, "w") as stream:
+        with open(CONFIG_FILE_NAME, "w", encoding="utf-8") as stream:
             yaml.dump(data, stream)
 
 
 def create_ex_yaml(
     dir: str,
-    dependencies: list[Path] = [],
+    dependencies: Optional[Iterable] = None,
     commit_hash: Optional[str] = None,
-    uncommited_files: list[str] = [],
+    uncommited_files: Optional[list[str]] = None,
+    *,
+    deleted_files=None,
+    comment=None,
+    started_at=None,
 ):
     args = " ".join(sys.argv)
     data = {
         "args": args,
-        "result_dir": dir,
-        "dependency": [str(dependency) for dependency in dependencies],
+        "result_dir": Path(dir).name,
+        "comment": comment,
+        "started_at": started_at,
+        "dependency": [
+            normalize_dependency(dependency) for dependency in (dependencies or [])
+        ],
         "git": {
-            "uncommited_files": uncommited_files,
+            "uncommited_files": uncommited_files or [],
+            "deleted_files": deleted_files or [],
             "commit_hash": commit_hash,
         },
     }
-    with Path(dir, "resutil-exp.yaml").open("w") as stream:
-        yaml.dump(data, stream, width=10000, allow_unicode=True)
+    write_yaml(Path(dir, "resutil-exp.yaml"), data)

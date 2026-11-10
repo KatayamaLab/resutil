@@ -16,8 +16,19 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
+      - name: Install and verify
+        run: |
+          uv sync --locked
+          uv run pytest -q
+          uv run black --check src tests
+          uv run flake8 src tests
+          uv run mypy src
+
       - name: Build (wheel and sdist)
         run: uv build --no-sources
+
+      - name: Validate distribution metadata
+        run: uvx --from twine==6.2.0 twine check dist/*
 
       - name: Save build artifacts
         uses: actions/upload-artifact@v4

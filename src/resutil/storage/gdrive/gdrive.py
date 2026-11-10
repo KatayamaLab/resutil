@@ -1,151 +1,151 @@
+from functools import wraps
 from os.path import basename
-import io
-
+from threading import RLock
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from ..storage import Storage
+from ...ex_dir import commented_name
+
+
+def synchronized(method):
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapped
+
+
+def _escape(value):
+    return value.replace("\\", "\\\\").replace("'", "\\'")
 
 
 class GDrive(Storage):
+    max_workers = 1
+
     def __init__(self, storage_config: dict, project_name: str):
-        key_file_path = storage_config["key_file_path"]
-        try:
-            credentials = service_account.Credentials.from_service_account_file(
-                key_file_path
-            ).with_scopes(["https://www.googleapis.com/auth/drive"])
-
-            self.service = build("drive", "v3", credentials=credentials)
-            self.base_folder_id = storage_config["base_folder_id"]
-
-        except FileNotFoundError:
-            raise ValueError(f"Key file not found at {key_file_path}")
-
+        self._lock = RLock()
+        credentials = service_account.Credentials.from_service_account_file(
+            storage_config["key_file_path"]
+        ).with_scopes(["https://www.googleapis.com/auth/drive"])
+        self.service = build("drive", "v3", credentials=credentials)
+        self.base_folder_id = storage_config["base_folder_id"]
         self.project_dir = project_name
-
-        query = f"name = '{project_name}' and mimeType = 'application/vnd.google-apps.folder'"
-        results = (
-            self.service.files()
-            .list(
-                q=query,
-                fields="files(id, name)",
-            )
-            .execute()
+        query = (
+            f"name = '{_escape(project_name)}' and "
+            "mimeType = 'application/vnd.google-apps.folder' and "
+            f"'{_escape(self.base_folder_id)}' in parents and trashed = false"
         )
-        items = results.get("files", [])
-
-        self.experiment_item_cache = items
-
-        for item in items:
-            if item["name"] == project_name:
-                self.project_dir_id = item["id"]
-                break
+        items = self._list(query)
+        if len(items) > 1:
+            raise ValueError(
+                "Multiple project folders found; resolve duplicate folders first."
+            )
+        if items:
+            self.project_dir_id = items[0]["id"]
         else:
-            file_metadata = {
-                "name": project_name,
-                "mimeType": "application/vnd.google-apps.folder",
-                "parents": [self.base_folder_id],
-            }
             folder = (
-                self.service.files().create(body=file_metadata, fields="id").execute()
-            )
-            self.project_dir_id = folder.get("id")
-
-        self.experiment_item_cache = None
-        self.max_workers = 1
-
-    def get_info(self) -> tuple[str, str, str]:
-        return {
-            "project_dir": self.project_dir,
-            "base_folder_id": self.base_folder_id,
-        }
-
-    def upload_experiment(self, zip_path: str):
-        if self.exist_experiment(basename(zip_path)[:-4]):
-            self.remove_experiment(basename(zip_path)[:-4])
-
-        file_metadata = {
-            "name": basename(zip_path),  # アップロードするファイル名
-            "parents": [self.project_dir_id],  # アップロード先のフォルダID
-        }
-        media = MediaFileUpload(zip_path, mimetype="application/zip")
-
-        self.service.files().create(
-            body=file_metadata, media_body=media, fields="id"
-        ).execute()
-
-    def download_experiment(self, zip_path: str):
-        file_id = self._find_file_id(basename(zip_path))
-
-        request = self.service.files().get_media(fileId=file_id)
-        fh = io.FileIO(zip_path, "wb")
-
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-
-    def get_all_experiment_names(self) -> list[str]:
-        query = f"'{self.project_dir_id}' in parents and trashed = false"
-        results = (
-            self.service.files()
-            .list(
-                q=query,
-                fields="files(id, name)",
-            )
-            .execute()
-        )
-        items = results.get("files", [])
-
-        self.experiment_item_cache = items
-
-        if not items:
-            return []
-        else:
-            filenames = [item["name"] for item in items]
-            return [f[:-4] for f in filenames]
-
-    def remove_experiment(self, ex_name: str):
-        filename = ex_name + ".zip"
-
-        file_id = self._find_file_id(filename)
-
-        try:
-            self.service.files().delete(fileId=file_id).execute()
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
-    def change_comment(self, ex_name, new_comment):
-        new_ex_name = f"{ex_name.split('_')[0]}_{ex_name.split('_')[1]}_{new_comment}"
-        old_name = ex_name + ".zip"
-        new_name = new_ex_name + ".zip"
-
-        file_id = self._find_file_id(old_name)
-
-        try:
-            file_metadata = {"name": new_name}
-            updated_file = (
                 self.service.files()
-                .update(fileId=file_id, body=file_metadata, fields="id, name")
+                .create(
+                    body={
+                        "name": project_name,
+                        "mimeType": "application/vnd.google-apps.folder",
+                        "parents": [self.base_folder_id],
+                    },
+                    fields="id",
+                )
                 .execute()
             )
-            print(
-                f"File ID: {updated_file.get('id')} renamed to {updated_file.get('name')}."
-            )
-        except Exception as e:
-            print(f"An error occurred: {e}")
+            self.project_dir_id = folder["id"]
 
-    def exist_experiment(self, ex_name: str) -> bool:
-        return ex_name in self.get_all_experiment_names()
+    @synchronized
+    def _list(self, query):
+        items, token = [], None
+        while True:
+            kwargs = dict(q=query, fields="nextPageToken,files(id,name)", pageSize=1000)
+            if token:
+                kwargs["pageToken"] = token
+            result = self.service.files().list(**kwargs).execute()
+            items.extend(result.get("files", []))
+            token = result.get("nextPageToken")
+            if not token:
+                return items
 
-    def _find_file_id(self, file_name):
-        if self.experiment_item_cache is None:
-            self.get_all_experiment_names()
+    def get_info(self) -> dict:
+        return {"project_dir": self.project_dir, "base_folder_id": self.base_folder_id}
 
-        for item in self.experiment_item_cache:
-            if item["name"] == file_name:
-                return item["id"]
+    @synchronized
+    def upload_experiment(self, zip_path: str):
+        file_id = self._find_file_id(basename(zip_path), required=False)
+        media = MediaFileUpload(zip_path, mimetype="application/zip", resumable=True)
+        try:
+            if file_id is not None:
+                self.service.files().update(
+                    fileId=file_id, media_body=media, fields="id"
+                ).execute()
+            else:
+                self.service.files().create(
+                    body={
+                        "name": basename(zip_path),
+                        "parents": [self.project_dir_id],
+                    },
+                    media_body=media,
+                    fields="id",
+                ).execute()
+        finally:
+            media.stream().close()
 
+    @synchronized
+    def download_experiment(self, zip_path: str):
+        file_id = self._find_file_id(basename(zip_path))
+        request = self.service.files().get_media(fileId=file_id)
+        with open(zip_path, "wb") as stream:
+            downloader = MediaIoBaseDownload(stream, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+
+    @synchronized
+    def get_all_experiment_names(self) -> list[str]:
+        query = f"'{_escape(self.project_dir_id)}' in parents and trashed = false"
+        return [
+            item["name"][:-4]
+            for item in self._list(query)
+            if item["name"].endswith(".zip")
+        ]
+
+    @synchronized
+    def remove_experiment(self, ex_name: str):
+        file_id = self._find_file_id(ex_name + ".zip")
+        self.service.files().delete(fileId=file_id).execute()
+
+    @synchronized
+    def change_comment(self, ex_name: str, new_comment: str):
+        new_name = commented_name(ex_name, new_comment)
+        if new_name == ex_name:
+            return
+        if self.exist_experiment(new_name):
+            raise FileExistsError(new_name)
+        self.service.files().update(
+            fileId=self._find_file_id(ex_name + ".zip"),
+            body={"name": new_name + ".zip"},
+            fields="id,name",
+        ).execute()
+
+    @synchronized
+    def _find_file_id(self, file_name, required=True):
+        query = (
+            f"'{_escape(self.project_dir_id)}' in parents and trashed = false "
+            f"and name = '{_escape(file_name)}'"
+        )
+        items = self._list(query)
+        if len(items) > 1:
+            raise ValueError(f"Multiple archives found: {file_name}")
+        if items:
+            return items[0]["id"]
+        if required:
+            raise FileNotFoundError(f"Remote experiment does not exist: {file_name}")
         return None

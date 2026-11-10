@@ -1,0 +1,69 @@
+--- a/src/resutil_server/routers/auth.py
++++ b/src/resutil_server/routers/auth.py
+@@ -1,3 +1,6 @@
++import json
++from urllib.parse import urlencode
++
+ from fastapi import APIRouter, Query, Request
+ from fastapi.responses import HTMLResponse
+ 
+@@ -14,17 +17,19 @@
+ @router.get("/login")
+ async def login(
+     request: Request,
+-    port: int = Query(description="CLI のローカルサーバーポート"),
++    port: int = Query(description="CLI のローカルサーバーポート", ge=1, le=65535),
++    state: str = Query(default="", max_length=256, pattern=r"^[A-Za-z0-9_-]*$"),
+ ) -> dict:
+     """CLI がブラウザで開く SSO ログインページの URL を返す。"""
+     signin_url = str(request.url_for("signin")).rstrip("/")
+-    login_url = f"{signin_url}?port={port}"
++    login_url = signin_url + "?" + urlencode({"port": port, "state": state})
+     return {"login_url": login_url, "api_key": settings.firebase_api_key}
+ 
+ 
+ @router.get("/signin", response_class=HTMLResponse)
+ async def signin(
+-    port: int = Query(description="CLI のローカルサーバーポート"),
++    port: int = Query(description="CLI のローカルサーバーポート", ge=1, le=65535),
++    state: str = Query(default="", max_length=256, pattern=r"^[A-Za-z0-9_-]*$"),
+ ) -> str:
+     """プロバイダ選択 → Firebase JS SDK で SSO → トークンを CLI に返す HTML ページ。"""
+     return f"""<!DOCTYPE html>
+@@ -106,7 +111,8 @@
+         window.location.href =
+           "http://localhost:{port}/callback"
+           + "?id_token=" + encodeURIComponent(idToken)
+-          + "&refresh_token=" + encodeURIComponent(refreshToken);
++          + "&refresh_token=" + encodeURIComponent(refreshToken)
++          + "&state=" + encodeURIComponent({json.dumps(state)});
+       }} catch (err) {{
+         status.className = "error";
+         status.textContent = "認証に失敗しました: " + err.message;
+--- a/tests/test_auth.py
++++ b/tests/test_auth.py
+@@ -34,3 +34,24 @@
+     assert resp.status_code == 200
+     assert "login('google')" in resp.text
+     assert "login('microsoft')" in resp.text
++
++
++def test_login_state_roundtrip():
++    client = TestClient(app)
++    state = "test_state-123"
++    resp = client.get("/auth/login", params={"port": 8085, "state": state})
++    assert resp.status_code == 200
++    assert "state=" + state in resp.json()["login_url"]
++    page = client.get(resp.json()["login_url"])
++    assert page.status_code == 200
++    assert 'encodeURIComponent("test_state-123")' in page.text
++
++
++def test_invalid_state_rejected():
++    client = TestClient(app)
++    assert client.get("/auth/signin", params={"port": 8085, "state": "<script>"}).status_code == 422
++
++
++def test_invalid_port_rejected():
++    client = TestClient(app)
++    assert client.get("/auth/login", params={"port": 0}).status_code == 422

@@ -51,5 +51,10 @@ All backends implement the `Storage` base class (`src/resutil/storage/storage.py
 
 - `RESUTIL_COMMENT` - Pre-set experiment comment (skips prompt)
 - `RESUTIL_NO_INTERACTIVE` - Non-interactive mode (no user prompts)
-- `RESUTIIL_REMOTE` - Suppress cloud upload (note: typo is intentional, kept for backwards compat)
+- `RESUTIL_NO_REMOTE` - Suppress cloud upload (legacy RESUTIIL_REMOTE is also accepted)
 - `RESUTIL_DEBUG` - Use temp directory, skip upload
+
+- `RESUTIL_TIMEZONE` - IANA time zone (default: local); metadata includes the UTC offset
+- `RESUTIL_STORAGE_TYPE`, `RESUTIL_GCS_BUCKET_NAME`, `RESUTIL_GCS_KEY_FILE_PATH` - Config overrides
+
+Reliability and server-login compatibility are documented in docs/review-fixes.md.
