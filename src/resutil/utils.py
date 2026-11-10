@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from .console import print
-import readline
+from prompt_toolkit import prompt as toolkit_prompt
 import yaml
 
 _NAME = re.compile(r"[a-zA-Z]{6}_\d{8}T\d{6}(?:_[^/\\]*)?\Z")
@@ -131,16 +131,8 @@ def write_yaml(path, data):
 
 
 def input_with_default(prompt, default=""):
-    def hook():
-        readline.insert_text(default)
-        readline.redisplay()
-
     print(prompt, end="")
-    readline.set_pre_input_hook(hook)
-    try:
-        return input("")
-    finally:
-        readline.set_pre_input_hook()
+    return toolkit_prompt("", default=default)
 
 
 @dataclass
