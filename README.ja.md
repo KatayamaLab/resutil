@@ -260,14 +260,105 @@ dependency: Dependencies (automatically extracted from directories in the comman
 ```
 
 
-## デプロイ方法
+## リリース手順
 
-1. `pyproject.toml` のバージョン番号を変更
-2. `main` ブランチにマージ
-3. `v*.*.*` タグを付与すると自動的にPyPIにデプロイされます
+`vX.Y.Z` タグのプッシュを契機に、
+[Publish Python Package](.github/workflows/publish.yaml) がPyPIへ公開します。
+GitHub Releaseは別途作成します。`uv`、Git、認証済みのGitHub CLI
+（`gh auth login`）を用意し、リポジトリのActionsシークレットに
+`PYPI_TOKEN` が設定されていることを確認してください。
 
+以下はPOSIXシェル用のコマンドです。一連の作業を通して `VERSION` の値を保持してください。
 
-### 安全性と追加設定
+1. 公開対象の変更を `main` にマージし、作業ツリーに未コミット変更がない状態にします。
+   PyPIとタグの両方で未使用のバージョンを選びます。以下の `0.2.4` は例です。
+
+   ```sh
+   git switch main
+   git pull --ff-only origin main
+   VERSION=0.2.4
+   ```
+
+   `pyproject.toml` の `[project].version` を同じ値へ変更し、
+   ロックファイルと環境を更新します。
+
+   ```sh
+   uv lock
+   uv sync --locked
+   ```
+
+   `docs/releases/v${VERSION}.md` に変更内容、互換性への影響、アップグレード方法を記載します。
+   [v0.2.3のリリースノート](docs/releases/v0.2.3.md)を参考にしてください。
+   サーバー変更が必要な場合は、対応するサーバーを先にデプロイします。
+
+2. テスト・静的検査を実行し、配布パッケージをビルドします。
+
+   ```sh
+   uv run pytest -q
+   uv run black --check src tests
+   uv run flake8 src tests
+   uv run mypy src
+   uv run mypy --platform win32 src
+   uv build --no-sources
+   uvx --from twine==6.2.0 twine check \
+     "dist/resutil-${VERSION}.tar.gz" \
+     "dist/resutil-${VERSION}-py3-none-any.whl"
+   ```
+
+   ローカルの `dist/` には過去のビルドが残る場合があるため、対象バージョンだけを検査します。
+   wheelとsdistの `core-metadata-version` は、公開ワークフローで使用する
+   Twineに対応した値を維持してください。
+
+3. リリース用ファイルの差分を確認してコミット・プッシュし、mainのCI成功を確認します。
+
+   ```sh
+   git add pyproject.toml uv.lock "docs/releases/v${VERSION}.md"
+   git diff --cached
+   git commit -m "Release v${VERSION}"
+   git push origin main
+   gh run list --repo KatayamaLab/resutil --workflow tests.yaml --branch main
+   ```
+
+   ほかに公開対象の変更ファイルがあれば、コミット前に追加します。
+   プッシュしたコミットの実行を選び、Linux・Windows、Python 3.10・3.12の
+   全ジョブが成功するまで待ちます。
+   `gh run watch RUN_ID --repo KatayamaLab/resutil --exit-status` の
+   `RUN_ID` を一覧に表示された実行IDへ置き換えると、完了を監視できます。
+
+4. 検証済みのコミットにタグを付けてプッシュし、PyPI公開を開始します。
+
+   ```sh
+   git tag -a "v${VERSION}" -m "Resutil v${VERSION}"
+   git push origin "v${VERSION}"
+   ```
+
+   タグのプッシュでテストと公開の両ワークフローが起動します。
+   公開処理では再検査、ビルド、配布メタデータ検査、`dist` Actionsアーティファクトの保存、
+   PyPIへのアップロードが実行されます。
+
+5. 同じタグとリリースノートを使ってGitHub Releaseを作成します。
+
+   ```sh
+   gh release create "v${VERSION}" --repo KatayamaLab/resutil \
+     --verify-tag --title "v${VERSION}" \
+     --notes-file "docs/releases/v${VERSION}.md" --latest
+   ```
+
+6. 両ワークフローの成功と、公開されたパッケージを確認します。
+
+   ```sh
+   gh run list --repo KatayamaLab/resutil --branch "v${VERSION}"
+   gh release view "v${VERSION}" --repo KatayamaLab/resutil
+   uvx --from "resutil==${VERSION}" resutil --version
+   ```
+
+   各実行は `gh run watch RUN_ID --repo KatayamaLab/resutil --exit-status` で確認できます。
+   [PyPI](https://pypi.org/project/resutil/)のバージョンと
+   [GitHub Releases](https://github.com/KatayamaLab/resutil/releases)の内容も確認してください。
+   公開済みのPyPIバージョンは上書きできないため、修正版には新しいバージョンを付けます。
+   公開済みタグを別のコミットへ付け替えないでください。
+
+## 安全性と追加設定
 
 - `resutil rm` は削除前に確認します。スクリプトでは `--yes` を指定できます。
 - `RESUTIL_NO_REMOTE` は認証とチェックポイントを含むアップロードを抑制します。

@@ -262,23 +262,103 @@ dependency: Dependencies (automatically extracted from directories in the comman
   - ex2
 ```
 
-## how to publish
+## Release procedure
 
-1. Change version number of `pyproject.toml`
-2. merge branch to `main`
-3. Add v*.*.* tag will automatically deploy to PyPI
-4. Add a [release note](https://github.com/KatayamaLab/resutil/releases) to GitHub such as:
-    ```
-    ## New Features
-    - Add `--resutil_debug` and `--resutil_no_remote` options for trial-and-error phase
-    - `-A` or `--all` options can be omitted for `resutil push/pull` commands
+Releases use a `vX.Y.Z` tag to publish to PyPI through
+[Publish Python Package](.github/workflows/publish.yaml). A GitHub Release is
+created separately. Use `uv`, Git, and an authenticated GitHub CLI (`gh auth login`).
+The repository must have the `PYPI_TOKEN` Actions secret configured.
 
-    ## Bug Fixed
-    - Fix a bug resuitl does not works properly when git is not initialized
-    ```
+The following commands use a POSIX shell. Keep `VERSION` set throughout the procedure.
 
+1. Merge the intended changes into `main` and start with a clean working tree.
+   Select a version not yet published on PyPI or used as a tag; `0.2.4` below is an example.
 
-### Reliability and configuration
+   ```sh
+   git switch main
+   git pull --ff-only origin main
+   VERSION=0.2.4
+   ```
+
+   Update `[project].version` in `pyproject.toml` to the same value, then update
+   the lock file and environment:
+
+   ```sh
+   uv lock
+   uv sync --locked
+   ```
+
+   Write `docs/releases/v${VERSION}.md` with the changes, compatibility notes,
+   and upgrade instructions. Use [v0.2.3](docs/releases/v0.2.3.md) as a reference.
+   If server changes are required, deploy the compatible server first.
+
+2. Run the checks and build both distributions:
+
+   ```sh
+   uv run pytest -q
+   uv run black --check src tests
+   uv run flake8 src tests
+   uv run mypy src
+   uv run mypy --platform win32 src
+   uv build --no-sources
+   uvx --from twine==6.2.0 twine check \
+     "dist/resutil-${VERSION}.tar.gz" \
+     "dist/resutil-${VERSION}-py3-none-any.whl"
+   ```
+
+   Check only the intended version: local `dist/` may contain older builds.
+   Keep the wheel and sdist `core-metadata-version` settings compatible with
+   the Twine version used in the publishing workflow.
+
+3. Review and commit the release files, push `main`, and confirm its CI succeeds:
+
+   ```sh
+   git add pyproject.toml uv.lock "docs/releases/v${VERSION}.md"
+   git diff --cached
+   git commit -m "Release v${VERSION}"
+   git push origin main
+   gh run list --repo KatayamaLab/resutil --workflow tests.yaml --branch main
+   ```
+
+   If additional files belong to the release, stage them before committing.
+   Inspect the run for the pushed commit and wait for all Linux/Windows,
+   Python 3.10/3.12 jobs to pass. Use `gh run watch RUN_ID --repo KatayamaLab/resutil --exit-status`,
+   replacing `RUN_ID` with the ID shown above.
+
+4. Tag the verified commit and push the tag to start PyPI publication:
+
+   ```sh
+   git tag -a "v${VERSION}" -m "Resutil v${VERSION}"
+   git push origin "v${VERSION}"
+   ```
+
+   The tag push starts both the test workflow and the publishing workflow.
+   Publication runs the checks again, builds and validates the distributions,
+   saves the `dist` Actions artifact, and uploads the package to PyPI.
+
+5. Create the GitHub Release using the same tag and release notes:
+
+   ```sh
+   gh release create "v${VERSION}" --repo KatayamaLab/resutil \
+     --verify-tag --title "v${VERSION}" \
+     --notes-file "docs/releases/v${VERSION}.md" --latest
+   ```
+
+6. Confirm both workflows succeed and verify the public release:
+
+   ```sh
+   gh run list --repo KatayamaLab/resutil --branch "v${VERSION}"
+   gh release view "v${VERSION}" --repo KatayamaLab/resutil
+   uvx --from "resutil==${VERSION}" resutil --version
+   ```
+
+   Watch each workflow with `gh run watch RUN_ID --repo KatayamaLab/resutil --exit-status`.
+   Confirm the package version on [PyPI](https://pypi.org/project/resutil/) and
+   the release notes on [GitHub Releases](https://github.com/KatayamaLab/resutil/releases).
+   Published PyPI versions cannot be overwritten; use a new version for a correction.
+   Do not move an already published tag to a different commit.
+
+## Reliability and configuration
 
 - `resutil rm` asks for confirmation; pass `--yes` for scripts. Without `--local`
   or `--remote`, both copies are deleted.
