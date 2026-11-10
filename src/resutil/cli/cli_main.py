@@ -6,7 +6,7 @@ from os.path import join
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
-from rich import print
+from ..console import print
 
 from ..ex_dir import (
     find_undownloaded_ex_dirs,

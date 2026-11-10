@@ -7,7 +7,8 @@ import yaml
 
 
 @pytest.mark.parametrize("fail", [False, True])
-def test_decorated_program_from_subdirectory(tmp_path, fail):
+@pytest.mark.parametrize("output_encoding", ["utf-8", "cp1252"])
+def test_decorated_program_from_subdirectory(tmp_path, fail, output_encoding):
     child = tmp_path / "child"
     child.mkdir()
     (tmp_path / "resutil-conf.yaml").write_text(
@@ -42,7 +43,10 @@ def test_decorated_program_from_subdirectory(tmp_path, fail):
         if not key.startswith(("RESUTIL_", "RESUTIIL_"))
     }
     env.update(
-        RESUTIL_NO_REMOTE="1", RESUTIL_NO_INTERACTIVE="1", RESUTIL_TIMEZONE="Asia/Tokyo"
+        RESUTIL_NO_REMOTE="1",
+        RESUTIL_NO_INTERACTIVE="1",
+        RESUTIL_TIMEZONE="Asia/Tokyo",
+        PYTHONIOENCODING=output_encoding,
     )
     result = subprocess.run(
         [sys.executable, str(script)],

@@ -7,7 +7,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from rich import print
+from .console import print
 import readline
 import yaml
 

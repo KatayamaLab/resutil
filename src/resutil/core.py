@@ -8,7 +8,7 @@ import zipfile
 
 import httpx
 import yaml
-from rich import print
+from .console import print
 
 from .config_file import CONFIG_FILE_NAME, Config
 from .exp_file import ExpFile

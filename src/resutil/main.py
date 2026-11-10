@@ -6,7 +6,7 @@ from contextlib import nullcontext
 import os
 import sys
 
-from rich import print
+from .console import print
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 

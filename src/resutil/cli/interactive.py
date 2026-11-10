@@ -934,7 +934,7 @@ class ResutilApp(App):
 
 def run_interactive():
     """Launch the TUI; only an absent config triggers initialization."""
-    from rich import print as rprint
+    from ..console import print as rprint
     from ..core import initialize
 
     config = Config()
