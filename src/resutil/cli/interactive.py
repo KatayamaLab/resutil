@@ -25,6 +25,8 @@ from textual.widgets import (
     Static,
 )
 
+from rich.cells import cell_len
+
 from ..config_file import Config, create_ex_yaml
 from ..core import (
     download_with_dependency,
@@ -36,6 +38,7 @@ from ..core import (
 from ..ex_dir import (
     create_ex_dir,
 )
+from ..i18n import t
 from ..utils import verify_comment, experiment_now
 from ..sync import is_synced
 
@@ -123,16 +126,18 @@ class ConfirmScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="confirm-dialog"):
-            yield Label("Confirm Deletion", classes="confirm-title")
+            yield Label(t("Confirm Deletion"), classes="confirm-title")
             yield Label(self.message_text)
             for d in self.details:
                 yield Label(f"  {d}", classes="confirm-body")
             yield Label("")
             yield Label(
-                "  Yes, delete", id="confirm-yes", classes="confirm-btn confirm-yes"
+                "  " + t("Yes, delete"),
+                id="confirm-yes",
+                classes="confirm-btn confirm-yes",
             )
             yield Label(
-                "▸ No, cancel",
+                "▸ " + t("No, cancel"),
                 id="confirm-no",
                 classes="confirm-btn confirm-no highlighted",
             )
@@ -142,14 +147,14 @@ class ConfirmScreen(ModalScreen[bool]):
         no_w = self.query_one("#confirm-no", Label)
         if self._cursor == 0:
             yes_w.add_class("highlighted")
-            yes_w.update("▸ Yes, delete")
+            yes_w.update("▸ " + t("Yes, delete"))
             no_w.remove_class("highlighted")
-            no_w.update("  No, cancel")
+            no_w.update("  " + t("No, cancel"))
         else:
             no_w.add_class("highlighted")
-            no_w.update("▸ No, cancel")
+            no_w.update("▸ " + t("No, cancel"))
             yes_w.remove_class("highlighted")
-            yes_w.update("  Yes, delete")
+            yes_w.update("  " + t("Yes, delete"))
 
     def on_key(self, event) -> None:
         event.stop()
@@ -201,13 +206,13 @@ class CommentInputScreen(ModalScreen[Optional[str]]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="comment-dialog"):
-            yield Label("Change Comment", classes="comment-title")
+            yield Label(t("Change Comment"), classes="comment-title")
             yield Input(
                 value=self.current_comment,
-                placeholder="Enter new comment",
+                placeholder=t("Enter new comment"),
                 id="comment-input",
             )
-            yield Label("Enter: confirm  Esc: cancel", classes="comment-hint")
+            yield Label(t("Enter: confirm  Esc: cancel"), classes="comment-hint")
 
     def on_mount(self) -> None:
         self.query_one("#comment-input", Input).focus()
@@ -219,7 +224,9 @@ class CommentInputScreen(ModalScreen[Optional[str]]):
             self.dismiss(value)
         elif value:
             self.notify(
-                "Invalid comment (max 200 UTF-8 bytes, no path separators or control characters)",
+                t(
+                    "Invalid comment (max 200 UTF-8 bytes, no path separators or control characters)"
+                ),
                 severity="error",
             )
         else:
@@ -264,11 +271,11 @@ class NewExperimentScreen(ModalScreen[Optional[str]]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="new-exp-dialog"):
-            yield Label("New Experiment", classes="new-exp-title")
+            yield Label(t("New Experiment"), classes="new-exp-title")
             yield Input(
-                placeholder="Enter comment for new experiment", id="new-exp-input"
+                placeholder=t("Enter comment for new experiment"), id="new-exp-input"
             )
-            yield Label("Enter: create  Esc: cancel", classes="new-exp-hint")
+            yield Label(t("Enter: create  Esc: cancel"), classes="new-exp-hint")
 
     def on_mount(self) -> None:
         self.query_one("#new-exp-input", Input).focus()
@@ -280,7 +287,9 @@ class NewExperimentScreen(ModalScreen[Optional[str]]):
             self.dismiss(value)
         else:
             self.notify(
-                "Invalid comment (max 200 UTF-8 bytes, no path separators or control characters)",
+                t(
+                    "Invalid comment (max 200 UTF-8 bytes, no path separators or control characters)"
+                ),
                 severity="error",
             )
 
@@ -328,25 +337,25 @@ class HelpScreen(ModalScreen[Optional[str]]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="help-dialog"):
-            yield Label("Keyboard Shortcuts", classes="help-title")
-            yield Label("Navigation", classes="help-section")
-            yield Label("  ↑/↓  k/j    Move cursor", classes="help-line")
-            yield Label("  Space        Toggle selection", classes="help-line")
-            yield Label("  Enter        Copy name to clipboard", classes="help-line")
+            yield Label(t("Keyboard Shortcuts"), classes="help-title")
+            yield Label(t("Navigation"), classes="help-section")
+            yield Label(t("  ↑/↓  k/j    Move cursor"), classes="help-line")
+            yield Label(t("  Space        Toggle selection"), classes="help-line")
+            yield Label(t("  Enter        Copy name to clipboard"), classes="help-line")
             yield Label("")
-            yield Label("Actions", classes="help-section")
-            yield Label("  c            Change comment", classes="help-line")
-            yield Label("  p            Push / Pull", classes="help-line")
-            yield Label("  x            Delete local", classes="help-line")
+            yield Label(t("Actions"), classes="help-section")
+            yield Label(t("  c            Change comment"), classes="help-line")
+            yield Label(t("  p            Push / Pull"), classes="help-line")
+            yield Label(t("  x            Delete local"), classes="help-line")
             yield Label("")
-            yield Label("Commands", classes="help-section")
-            yield Label("  f /          Focus filter", classes="help-line")
-            yield Label("  n            New experiment", classes="help-line")
-            yield Label("  s            Settings (re-init)", classes="help-line")
-            yield Label("  q  Ctrl+C    Quit", classes="help-line")
-            yield Label("  ?            Show this help", classes="help-line")
+            yield Label(t("Commands"), classes="help-section")
+            yield Label(t("  f /          Focus filter"), classes="help-line")
+            yield Label(t("  n            New experiment"), classes="help-line")
+            yield Label(t("  s            Settings (re-init)"), classes="help-line")
+            yield Label(t("  q  Ctrl+C    Quit"), classes="help-line")
+            yield Label(t("  ?            Show this help"), classes="help-line")
             yield Label("")
-            yield Label("Press any key to close", classes="help-line")
+            yield Label(t("Press any key to close"), classes="help-line")
 
     def on_key(self, event) -> None:
         event.stop()
@@ -462,14 +471,16 @@ class ResutilApp(App):
             yield DataTable(id="exp-table", cursor_type="row")
         with Vertical(id="bottom-bar"):
             with Horizontal(id="filter-row"):
-                yield Label("[bold green]F[/]ilter: ", id="filter-label")
-                yield Input(placeholder="type to filter...", id="filter-input")
+                yield Label(t("[bold green]F[/]ilter: "), id="filter-label")
+                yield Input(placeholder=t("type to filter..."), id="filter-input")
             yield Static(
-                "[bold green]N[/]ew  [bold green]C[/]omment  [bold green]P[/]ush/Pull  [bold red]X[/] delete  [bold green]S[/]ettings  [bold red]Q[/]uit  [bold]?[/]help",
+                t(
+                    "[bold green]N[/]ew  [bold green]C[/]omment  [bold green]P[/]ush/Pull  [bold red]X[/] delete  [bold green]S[/]ettings  [bold red]Q[/]uit  [bold]?[/]help"
+                ),
                 id="shortcut-row",
             )
             yield Static(
-                "↑↓ move  [bold]Space[/] select  [bold]Enter[/] copy",
+                t("↑↓ move  [bold]Space[/] select  [bold]Enter[/] copy"),
                 id="hint-row",
             )
 
@@ -538,7 +549,8 @@ class ResutilApp(App):
         except Exception as exc:
             self._remote_available = False
             self.notify(
-                f"Could not refresh remote experiments: {exc}", severity="error"
+                t("Could not refresh remote experiments: {error}", error=exc),
+                severity="error",
             )
         self._all_experiments = sorted(list(self._local_names | self._remote_names))
 
@@ -567,15 +579,16 @@ class ResutilApp(App):
         table.clear(columns=True)
 
         table.add_column("", key="sel", width=3)
-        table.add_column("LOCAL", key="local", width=5)
-        table.add_column("REMOTE", key="remote", width=6)
+        local_label, remote_label = t("LOCAL"), t("REMOTE")
+        table.add_column(local_label, key="local", width=cell_len(local_label))
+        table.add_column(remote_label, key="remote", width=cell_len(remote_label))
 
         if self._wide_mode:
-            table.add_column("DATE", key="date", width=18)
-            table.add_column("DIRECTORY", key="dir")
-            table.add_column("COMMENT", key="comment")
+            table.add_column(t("DATE"), key="date", width=18)
+            table.add_column(t("DIRECTORY"), key="dir")
+            table.add_column(t("COMMENT"), key="comment")
         else:
-            table.add_column("DIRECTORY NAME", key="dir")
+            table.add_column(t("DIRECTORY NAME"), key="dir")
 
         filtered = self._filtered_experiments()
         for name in filtered:
@@ -596,12 +609,19 @@ class ResutilApp(App):
 
         ver = version("resutil")
         if self.filter_text:
-            self.sub_title = (
-                f"{self.config.project_name} — v{ver} — {count}/{total} filtered"
+            self.sub_title = t(
+                "{project} — v{version} — {count}/{total} filtered",
+                project=self.config.project_name,
+                version=ver,
+                count=count,
+                total=total,
             )
         else:
-            self.sub_title = (
-                f"{self.config.project_name} — v{ver} — {total} experiments"
+            self.sub_title = t(
+                "{project} — v{version} — {total} experiments",
+                project=self.config.project_name,
+                version=ver,
+                total=total,
             )
 
     def _restore_table_state(self, target_row: int | None, scroll_y: float) -> None:
@@ -707,7 +727,7 @@ class ResutilApp(App):
         name = self._get_cursor_experiment()
         if name:
             self._copy_to_clipboard(name)
-            self.notify(f"Copied: {name}", severity="information")
+            self.notify(t("Copied: {name}", name=name), severity="information")
 
     @staticmethod
     def _copy_to_clipboard(text: str) -> None:
@@ -738,24 +758,28 @@ class ResutilApp(App):
         try:
             for name in names:
                 if name in self._local_names and name in self._dirty_names:
-                    self.notify(f"Pushing {name}...")
+                    self.notify(t("Pushing {name}...", name=name))
                     upload_with_dependency(name, self.config.results_dir, self.storage)
-            self.app.call_from_thread(self._after_operation, "Push complete")
+            self.app.call_from_thread(self._after_operation, t("Push complete"))
         except Exception as e:
-            self.app.call_from_thread(self._after_error, f"Push failed: {e}")
+            self.app.call_from_thread(
+                self._after_error, t("Push failed: {error}", error=e)
+            )
 
     @work(thread=True)
     def _do_pull(self, names: list[str]) -> None:
         try:
             for name in names:
                 if name not in self._local_names and name in self._remote_names:
-                    self.notify(f"Pulling {name}...")
+                    self.notify(t("Pulling {name}...", name=name))
                     download_with_dependency(
                         name, self.config.results_dir, self.storage
                     )
-            self.app.call_from_thread(self._after_operation, "Pull complete")
+            self.app.call_from_thread(self._after_operation, t("Pull complete"))
         except Exception as e:
-            self.app.call_from_thread(self._after_error, f"Pull failed: {e}")
+            self.app.call_from_thread(
+                self._after_error, t("Pull failed: {error}", error=e)
+            )
 
     def _do_comment(self, name: str) -> None:
         parsed = _parse_experiment(name)
@@ -776,24 +800,26 @@ class ResutilApp(App):
                 self.config.results_dir, name, new_comment, self.storage
             )
             self.app.call_from_thread(
-                self._after_operation_with_cursor, "Comment changed", new_name
+                self._after_operation_with_cursor, t("Comment changed"), new_name
             )
         except Exception as e:
-            self.app.call_from_thread(self._after_error, f"Comment change failed: {e}")
+            self.app.call_from_thread(
+                self._after_error, t("Comment change failed: {error}", error=e)
+            )
 
     def _do_remove(self, names: list[str]) -> None:
         local_names = [n for n in names if n in self._local_names]
         if not local_names:
-            self.notify("No local experiments to delete", severity="warning")
+            self.notify(t("No local experiments to delete"), severity="warning")
             return
 
         details = local_names[:5]
         if len(local_names) > 5:
-            details.append(f"... and {len(local_names) - 5} more")
+            details.append(t("... and {n} more", n=len(local_names) - 5))
 
         self.push_screen(
             ConfirmScreen(
-                message=f"Delete {len(local_names)} experiment(s) from local?",
+                message=t("Delete {n} experiment(s) from local?", n=len(local_names)),
                 details=details,
             ),
             callback=lambda confirmed: self._execute_remove(local_names, confirmed),
@@ -821,12 +847,14 @@ class ResutilApp(App):
             remove_local(names, self.config.results_dir)
             if cursor_hint and cursor_hint not in removed:
                 self.app.call_from_thread(
-                    self._after_operation_with_cursor, "Remove complete", cursor_hint
+                    self._after_operation_with_cursor, t("Remove complete"), cursor_hint
                 )
             else:
-                self.app.call_from_thread(self._after_operation, "Remove complete")
+                self.app.call_from_thread(self._after_operation, t("Remove complete"))
         except Exception as e:
-            self.app.call_from_thread(self._after_error, f"Remove failed: {e}")
+            self.app.call_from_thread(
+                self._after_error, t("Remove failed: {error}", error=e)
+            )
 
     def _after_operation(self, message: str) -> None:
         self._selected.clear()
@@ -863,9 +891,13 @@ class ResutilApp(App):
             ex_name = create_ex_dir(experiment_now(), comment, self.config.results_dir)
             ex_dir_path = join(self.config.results_dir, ex_name)
             create_ex_yaml(ex_dir_path, [])
-            self.app.call_from_thread(self._after_new_experiment, f"Created: {ex_name}")
+            self.app.call_from_thread(
+                self._after_new_experiment, t("Created: {name}", name=ex_name)
+            )
         except Exception as e:
-            self.app.call_from_thread(self._after_error, f"Create failed: {e}")
+            self.app.call_from_thread(
+                self._after_error, t("Create failed: {error}", error=e)
+            )
 
     def _after_new_experiment(self, message: str) -> None:
         self._selected.clear()
@@ -887,7 +919,7 @@ class ResutilApp(App):
         if len(names) == 1:
             self._do_comment(names[0])
         elif len(names) > 1:
-            self.notify("Select a single experiment for comment", severity="warning")
+            self.notify(t("Select a single experiment for comment"), severity="warning")
 
     def action_shortcut_push_pull(self) -> None:
         names = self._get_target_names()
@@ -896,7 +928,7 @@ class ResutilApp(App):
         self._refresh_data()
         if not self._remote_available:
             self.notify(
-                "Remote is unavailable; retry when connected.", severity="error"
+                t("Remote is unavailable; retry when connected."), severity="error"
             )
             return
         pushable = [n for n in names if n in self._dirty_names]
@@ -908,7 +940,7 @@ class ResutilApp(App):
         elif pullable:
             self._do_pull(pullable)
         else:
-            self.notify("Already synced", severity="information")
+            self.notify(t("Already synced"), severity="information")
 
     def action_shortcut_delete(self) -> None:
         names = self._get_target_names()
@@ -918,7 +950,7 @@ class ResutilApp(App):
     # -- Settings / Help / Quit ---------------------------------------------
 
     def action_settings(self) -> None:
-        self.notify("Run 'resutil init' to reconfigure settings", severity="warning")
+        self.notify(t("Run 'resutil init' to reconfigure settings"), severity="warning")
 
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())
@@ -946,7 +978,7 @@ def run_interactive():
         config, storage = initialize()
     except (PermissionError, FileNotFoundError):
         if config.storage_type != "server":
-            rprint("[red]Storage credentials are unavailable.[/red]")
+            rprint(t("[red]Storage credentials are unavailable.[/red]"))
             return True
         from .cli_main import command_login
         from types import SimpleNamespace
@@ -957,10 +989,10 @@ def run_interactive():
             )
             config, storage = initialize()
         except Exception as exc:
-            rprint(f"[red]Authentication failed: {exc}[/red]")
+            rprint(t("[red]Authentication failed: {error}[/red]", error=exc))
             return True
     except Exception as exc:
-        rprint(f"[red]Cannot connect to storage: {exc}[/red]")
+        rprint(t("[red]Cannot connect to storage: {error}[/red]", error=exc))
         return True
     ResutilApp(config, storage).run()
     return True

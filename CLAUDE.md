@@ -55,6 +55,7 @@ All backends implement the `Storage` base class (`src/resutil/storage/storage.py
 - `RESUTIL_DEBUG` - Use temp directory, skip upload
 
 - `RESUTIL_TIMEZONE` - IANA time zone (default: local); metadata includes the UTC offset
+- `RESUTIL_LANG` - Message language (`ja`/`en`); default follows `LC_ALL`/`LC_MESSAGES`/`LANG`, then the OS UI language. Messages live in `i18n.py` (`t()` keyed by English text, `JA` catalog)
 - `RESUTIL_STORAGE_TYPE`, `RESUTIL_GCS_BUCKET_NAME`, `RESUTIL_GCS_KEY_FILE_PATH` - Config overrides
 
 Reliability and server-login compatibility are documented in docs/review-fixes.md.

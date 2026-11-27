@@ -5,6 +5,7 @@ from google.oauth2 import service_account
 
 from ..storage import Storage
 from ...ex_dir import commented_name
+from ...i18n import t
 
 
 class GCS(Storage):
@@ -21,7 +22,7 @@ class GCS(Storage):
             self.client = storage.Client(credentials=credentials)
             self.bucket_name = bucket_name
         except FileNotFoundError:
-            raise ValueError(f"Key file not found at {key_file_path}")
+            raise ValueError(t("Key file not found at {path}", path=key_file_path))
 
         self.project_dir = project_name
 

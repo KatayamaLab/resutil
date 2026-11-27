@@ -125,3 +125,126 @@ def test_invalid_environment_comment(runtime, monkeypatch):
 
     with pytest.raises(ValueError, match="RESUTIL_COMMENT"):
         run()
+
+
+@pytest.fixture
+def offline_start(tmp_path, monkeypatch, runtime):
+    config, storage = runtime
+
+    def initialize(connect=True):
+        if connect:
+            raise m.StorageOfflineError("Cannot reach server storage")
+        return config, None
+
+    monkeypatch.setattr(m, "initialize", initialize)
+    return config, storage
+
+
+def test_offline_at_start_runs_locally(offline_start, capsys):
+    config, storage = offline_start
+
+    @m.main()
+    def run(params):
+        assert params.save_checkpoint() is False
+        return params.ex_dir
+
+    from pathlib import Path
+
+    directory = run()
+    assert Path(directory).is_dir()
+    assert not storage.archives
+    out = capsys.readouterr().out
+    assert "offline mode" in out
+    assert "resutil push" in out
+
+
+def test_auth_error_at_start_stops(runtime, monkeypatch):
+    def initialize(connect=True):
+        raise PermissionError("Run 'resutil login' again.")
+
+    monkeypatch.setattr(m, "initialize", initialize)
+
+    @m.main()
+    def run(params):
+        pytest.fail("must not execute")
+
+    with pytest.raises(PermissionError):
+        run()
+
+
+def test_network_failure_on_final_upload_is_not_fatal(runtime, monkeypatch, capsys):
+    _, storage = runtime
+
+    def unreachable(zip_path):
+        raise ConnectionError("getaddrinfo failed")
+
+    monkeypatch.setattr(storage, "upload_experiment", unreachable)
+
+    @m.main()
+    def run(params):
+        assert params.save_checkpoint() is False
+        return "ok"
+
+    assert run() == "ok"
+    assert "resutil push" in capsys.readouterr().out
+
+
+def test_network_failure_after_user_error_keeps_user_error(runtime, monkeypatch):
+    _, storage = runtime
+
+    def unreachable(zip_path):
+        raise ConnectionError("getaddrinfo failed")
+
+    monkeypatch.setattr(storage, "upload_experiment", unreachable)
+
+    @m.main()
+    def run(params):
+        raise ValueError("user error")
+
+    with pytest.raises(ValueError, match="user error"):
+        run()
+
+
+def test_missing_dependency_offline_does_not_run(offline_start, monkeypatch):
+    config, _ = offline_start
+    from pathlib import Path
+
+    from conftest import A
+
+    monkeypatch.setattr(
+        m.sys, "argv", ["example.py", str(Path(config.results_dir) / A / "x.npy")]
+    )
+
+    @m.main()
+    def run(params):
+        pytest.fail("must not execute")
+
+    with pytest.raises(FileNotFoundError, match="offline") as info:
+        run()
+    assert A in str(info.value)
+    assert not Path(config.results_dir).exists() or not any(
+        Path(config.results_dir).iterdir()
+    )
+
+
+def test_dependency_download_network_failure_does_not_run(runtime, monkeypatch):
+    config, storage = runtime
+    from pathlib import Path
+
+    from conftest import A
+
+    monkeypatch.setattr(
+        m.sys, "argv", ["example.py", str(Path(config.results_dir) / A / "x.npy")]
+    )
+
+    def unreachable(*args):
+        raise ConnectionError("getaddrinfo failed")
+
+    monkeypatch.setattr(m, "download_with_dependency", unreachable)
+
+    @m.main()
+    def run(params):
+        pytest.fail("must not execute")
+
+    with pytest.raises(m.StorageOfflineError, match=A):
+        run()

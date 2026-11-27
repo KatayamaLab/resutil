@@ -363,8 +363,14 @@ GitHub Releaseは別途作成します。`uv`、Git、認証済みのGitHub CLI
 - `resutil rm` は削除前に確認します。スクリプトでは `--yes` を指定できます。
 - `RESUTIL_NO_REMOTE` は認証とチェックポイントを含むアップロードを抑制します。
   旧表記 `RESUTIIL_REMOTE` も互換用に受け付けます。
+- ネットワークに接続できずストレージへ到達できない場合、`@resutil.main()` は
+  オフラインモードに切り替え、結果をローカルに保存して正常終了します。最後のアップロードが
+  ネットワーク障害で失敗した場合も同様です。後で `resutil push` を実行してください。
+  認証エラーの場合は実行を停止します（`resutil login` を実行してください）。
+  リモートにしかない依存実験はオフラインでは取得できないため、実行を停止します。
 - `RESUTIL_DEBUG` は実行ごとの一時ディレクトリを使用し、終了時に削除します。
 - `RESUTIL_TIMEZONE=Asia/Tokyo` のようにIANAタイムゾーンを指定できます。
+- `RESUTIL_LANG=ja` / `RESUTIL_LANG=en` で表示言語を指定できます。未指定の場合は `LC_ALL`/`LC_MESSAGES`/`LANG`、次にOSの言語設定に従います(日本語または英語)。
 - `RESUTIL_STORAGE_TYPE`、`RESUTIL_GCS_BUCKET_NAME`、
   `RESUTIL_GCS_KEY_FILE_PATH` で設定を上書きできます。
 - 設定内の相対パスは設定ファイルを基準に解決し、作業ディレクトリは変更しません。

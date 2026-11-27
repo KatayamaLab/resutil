@@ -137,3 +137,24 @@ def test_drive_failed_update_never_deletes(tmp_path, monkeypatch):
     with pytest.raises(OSError):
         storage.upload_experiment(str(archive))
     storage.service.files.return_value.delete.assert_not_called()
+
+
+def test_construction_with_expired_token_works_offline(creds, monkeypatch):
+    creds["id_token"] = token(1)
+    server._save_credentials(creds)
+    refresh = MagicMock(side_effect=httpx.ConnectError("getaddrinfo failed"))
+    monkeypatch.setattr(server, "_refresh_id_token", refresh)
+    storage = server.ResutilServerStorage(
+        {"server_url": creds["server_url"], "bucket_name": "test"}, "project"
+    )
+    storage._client.close()
+    refresh.assert_not_called()
+
+
+@pytest.mark.parametrize("status", [400, 401, 403])
+def test_rejected_refresh_token_is_auth_error(monkeypatch, status):
+    monkeypatch.setattr(
+        server.httpx, "post", lambda *a, **k: httpx.Response(status, json={})
+    )
+    with pytest.raises(PermissionError, match="resutil login"):
+        server._refresh_id_token("refresh", "key")

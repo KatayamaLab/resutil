@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from .console import print
+from .i18n import t
 from prompt_toolkit import prompt as toolkit_prompt
 import yaml
 
@@ -38,14 +39,14 @@ def validate_experiment_name(name: str) -> str:
         or not _NAME.fullmatch(name)
         or len(name.encode("utf-8")) > 251
     ):
-        raise ValueError(f"Invalid experiment name: {name!r}")
+        raise ValueError(t("Invalid experiment name: {name!r}", name=name))
     if not verify_comment(
         name.split("_", 2)[2] if len(name.split("_", 2)) == 3 else ""
     ):
         # Generated collision suffixes may add nine bytes to the comment.
         suffix = name.split("_", 2)[2]
         if not (re.match(r"^[0-9a-f]{8}_", suffix) and verify_comment(suffix[9:])):
-            raise ValueError(f"Invalid experiment name: {name!r}")
+            raise ValueError(t("Invalid experiment name: {name!r}", name=name))
     return name
 
 
@@ -60,7 +61,13 @@ def experiment_path(results_dir, name):
     root = Path(results_dir).resolve()
     path = root / name
     if path.is_symlink() or path.resolve().parent != root:
-        raise ValueError(f"Experiment must be a direct directory under {root}: {name}")
+        raise ValueError(
+            t(
+                "Experiment must be a direct directory under {root}: {name}",
+                root=root,
+                name=name,
+            )
+        )
     return path
 
 
@@ -99,6 +106,7 @@ def timestamp_parts(now):
 
 def user_confirm(question: str, default="") -> bool:
     yn = "(Y/n)" if default == "y" else "(y/N)" if default == "n" else "(y/n)"
+    original = question
     while True:
         print(f"{question} [bold]{yn}[/bold]: ", end="")
         reply = input().lower().strip()
@@ -108,8 +116,7 @@ def user_confirm(question: str, default="") -> bool:
             return False
         if not reply and default in ("y", "n"):
             return default == "y"
-        question = question.removeprefix("Please try again - ")
-        question = f"Please try again - {question}"
+        question = t("Please try again - {question}", question=original)
 
 
 def atomic_write(path, text):

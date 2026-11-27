@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Iterable
 
+from .i18n import t
 from .utils import normalize_dependency, write_yaml
 
 
@@ -26,7 +27,9 @@ class Config:
             with config_file_path.open("r", encoding="utf-8") as f:
                 conf = yaml.safe_load(f)
         except FileNotFoundError:
-            raise FileNotFoundError(f"config file {config_file_path} does not exist.")
+            raise FileNotFoundError(
+                t("config file {path} does not exist.", path=config_file_path)
+            )
 
         self.project_name: str = conf["project_name"]
         self.results_dir: str = str(
@@ -69,36 +72,48 @@ class Config:
     def set_results_dir(self, results_dir: str):
         # check existence
         if not Path(results_dir).exists():
-            raise ValueError(f"results_dir {results_dir} does not exist.")
+            raise ValueError(t("results_dir {path} does not exist.", path=results_dir))
         self.results_dir = results_dir
 
     def set_storage_type(self, storage_type: str):
         if storage_type not in ["gs", "gcs", "gdrive", "server"]:
-            raise ValueError("storage_type must be 'gcs', 'gdrive' or 'server'")
+            raise ValueError(t("storage_type must be 'gcs', 'gdrive' or 'server'"))
         self.storage_type = storage_type
 
     def set_storage_config(self, storage_config):
         # check storage_config is valid
         if self.storage_type == "gs" or self.storage_type == "gcs":
             if "key_file_path" not in storage_config:
-                raise ValueError("storage_config must have 'key_file_path' key")
+                raise ValueError(
+                    t("storage_config must have '{key}' key", key="key_file_path")
+                )
             if (
                 "bucket_name" not in storage_config
                 and "backet_name" not in storage_config
             ):
-                raise ValueError("storage_config must have 'bucket_name' key")
+                raise ValueError(
+                    t("storage_config must have '{key}' key", key="bucket_name")
+                )
         elif self.storage_type == "gdrive":
             if "key_file_path" not in storage_config:
-                raise ValueError("storage_config must have 'key_file_path' key")
+                raise ValueError(
+                    t("storage_config must have '{key}' key", key="key_file_path")
+                )
             if "base_folder_id" not in storage_config:
-                raise ValueError("storage_config must have 'base_folder_id' key")
+                raise ValueError(
+                    t("storage_config must have '{key}' key", key="base_folder_id")
+                )
         elif self.storage_type == "server":
             if "server_url" not in storage_config:
-                raise ValueError("storage_config must have 'server_url' key")
+                raise ValueError(
+                    t("storage_config must have '{key}' key", key="server_url")
+                )
             if "bucket_name" not in storage_config:
-                raise ValueError("storage_config must have 'bucket_name' key")
+                raise ValueError(
+                    t("storage_config must have '{key}' key", key="bucket_name")
+                )
         else:
-            raise ValueError("storage_type must be 'gcs', 'gdrive' or 'server'")
+            raise ValueError(t("storage_type must be 'gcs', 'gdrive' or 'server'"))
         self.storage_config = storage_config
 
     def save(self):

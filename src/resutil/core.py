@@ -6,9 +6,9 @@ import stat
 import tempfile
 import zipfile
 
-import httpx
 import yaml
 from .console import print
+from .i18n import t
 
 from .config_file import CONFIG_FILE_NAME, Config
 from .exp_file import ExpFile
@@ -19,6 +19,7 @@ from .ex_dir import (
     commented_name,
     rewrite_metadata,
 )
+from .network import StorageOfflineError, is_network_error
 from .sync import archive_digest, record_sync, is_synced
 from .utils import experiment_path, validate_experiment_name, write_yaml
 
@@ -30,35 +31,48 @@ def initialize(connect=True):
     config.load()
     if not connect:
         return config, None
-    if config.storage_type in ("gcs", "gs"):
-        from .storage import GCS
-
-        storage = GCS(config.storage_config, config.project_name)
-    elif config.storage_type == "gdrive":
-        from .storage import GDrive
-
-        storage = GDrive(config.storage_config, config.project_name)
-    elif config.storage_type == "server":
-        from .storage import ResutilServerStorage
-
-        try:
-            storage = ResutilServerStorage(config.storage_config, config.project_name)
-        except httpx.HTTPError as exc:
-            raise ConnectionError(
-                "Cannot refresh server credentials; check the connection or run 'resutil login'."
+    try:
+        storage = create_storage(config)
+    except Exception as exc:
+        if is_network_error(exc):
+            raise StorageOfflineError(
+                t(
+                    "Cannot reach {storage} storage (network unavailable): {error}",
+                    storage=config.storage_type,
+                    error=exc,
+                )
             ) from exc
-    else:
-        raise ValueError(f"Wrong storage type. Check your {CONFIG_FILE_NAME} file.")
-    print(f"📦 Connected to {config.storage_type}")
+        raise
+    print(t("📦 Connected to {storage}", storage=config.storage_type))
     for key, value in storage.get_info().items():
         print(f"  {key}: {value}")
     return config, storage
 
 
+def create_storage(config):
+    if config.storage_type in ("gcs", "gs"):
+        from .storage import GCS
+
+        return GCS(config.storage_config, config.project_name)
+    if config.storage_type == "gdrive":
+        from .storage import GDrive
+
+        return GDrive(config.storage_config, config.project_name)
+    if config.storage_type == "server":
+        from .storage import ResutilServerStorage
+
+        return ResutilServerStorage(config.storage_config, config.project_name)
+    raise ValueError(
+        t("Wrong storage type. Check your {file} file.", file=CONFIG_FILE_NAME)
+    )
+
+
 def zip_directory(folder_path, zip_path):
     root = Path(folder_path)
     if not root.is_dir() or root.is_symlink():
-        raise FileNotFoundError(f"Experiment directory does not exist: {root}")
+        raise FileNotFoundError(
+            t("Experiment directory does not exist: {path}", path=root)
+        )
 
     def onerror(error):
         raise error
@@ -76,12 +90,14 @@ def zip_directory(folder_path, zip_path):
 def upload(ex_name, results_dir, storage):
     path = experiment_path(results_dir, ex_name)
     if not path.is_dir():
-        raise FileNotFoundError(f"Local experiment does not exist: {ex_name}")
+        raise FileNotFoundError(
+            t("Local experiment does not exist: {name}", name=ex_name)
+        )
     with tempfile.TemporaryDirectory() as temp:
         archive = Path(temp) / f"{ex_name}.zip"
         zip_directory(path, archive)
         digest = archive_digest(archive)
-        print(f"🗂️ Uploading: {ex_name}")
+        print(t("🗂️ Uploading: {name}", name=ex_name))
         storage.upload_experiment(str(archive))
         record_sync(results_dir, ex_name, storage, digest)
 
@@ -109,7 +125,9 @@ def upload_with_dependency(ex_name, results_dir, storage):
         if not path.is_dir():
             if name != ex_name and name in remote:
                 continue
-            raise FileNotFoundError(f"Local experiment does not exist: {name}")
+            raise FileNotFoundError(
+                t("Local experiment does not exist: {name}", name=name)
+            )
         if (
             name == ex_name
             or name not in remote
@@ -148,11 +166,15 @@ def unzip_file(zip_path, extract_to):
 def download(ex_name, results_dir, storage):
     target = experiment_path(results_dir, ex_name)
     if target.exists():
-        raise FileExistsError(f"Local experiment already exists: {ex_name}")
+        raise FileExistsError(
+            t("Local experiment already exists: {name}", name=ex_name)
+        )
     if not storage.exist_experiment(ex_name):
-        raise FileNotFoundError(f"Remote experiment does not exist: {ex_name}")
+        raise FileNotFoundError(
+            t("Remote experiment does not exist: {name}", name=ex_name)
+        )
     target.parent.mkdir(parents=True, exist_ok=True)
-    print(f"🗂️ Downloading: {ex_name}")
+    print(t("🗂️ Downloading: {name}", name=ex_name))
     with tempfile.TemporaryDirectory(
         prefix=".resutil-download-", dir=target.parent
     ) as temp:
@@ -195,10 +217,10 @@ def remove_local(ex_names, results_dir):
     paths = [(name, experiment_path(results_dir, name)) for name in ex_names]
     for name, path in paths:
         if path.is_dir():
-            print(f"🗑️ Removing (local): {name}")
+            print(t("🗑️ Removing (local): {name}", name=name))
             shutil.rmtree(path)
         else:
-            print(f"⚠️ {name} does not exist in the local directory.")
+            print(t("⚠️ {name} does not exist in the local directory.", name=name))
 
 
 def remove_remote(ex_names, storage):
@@ -209,7 +231,7 @@ def remove_remote(ex_names, storage):
         if name in remote:
             storage.remove_experiment(name)
         else:
-            print(f"⚠️ {name} does not exist in the remote directory.")
+            print(t("⚠️ {name} does not exist in the remote directory.", name=name))
 
 
 def change_experiment_comment(results_dir, name, comment, storage):
