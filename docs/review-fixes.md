@@ -16,10 +16,19 @@
   The original remote target remains available until updated references have been saved.
   Other clients' existing local copies keep their previous names and metadata.
 - User exceptions, interrupts and SystemExit retain their exit semantics after best-effort
-  result upload. Successful computation with failed final upload raises an error.
+  result upload. Successful computation with failed final upload raises an error,
+  except for network failures (see offline mode below).
   Checkpoint failure returns False and does not abort computation.
 - NO_REMOTE and DEBUG skip storage authentication and all uploads. Debug output is held
   in a unique temporary directory and removed when the wrapped call finishes.
+- Offline mode (#48): network failures (DNS, connection, timeout; classified in network.py)
+  while connecting switch @resutil.main() to offline mode instead of aborting. A network
+  failure during the final upload prints a 'resutil push' hint and exits normally.
+  Authentication errors (401/403, rejected refresh token, missing or mismatched
+  credentials) and HTTP status errors still fail. Dependencies are resolved before the
+  experiment directory is created; a dependency that is missing locally and cannot be
+  downloaded stops execution with an explanatory error.
+  Server credentials are no longer refreshed at construction; _request() refreshes them.
 - Configuration paths resolve relative to the config file; the process cwd is unchanged.
 - Metadata, configuration and text files use UTF-8. Comments are limited to 200 UTF-8 bytes.
 - RESUTIL_TIMEZONE accepts an IANA zone, such as Asia/Tokyo. The default is the local zone.
@@ -37,7 +46,7 @@
 - Tests use temporary directories, in-memory storage, mocked Google clients and HTTP transports.
   Real cloud storage is not contacted.
 
-Related issues: #20, #28, #29, #31, #33, #34, #37, #39, #41, #45.
+Related issues: #20, #28, #29, #31, #33, #34, #37, #39, #41, #45, #48.
 The architecture-only request #15 is intentionally outside this bug-fix scope.
 Windows readline dependency (#36), keyless server authentication (#44) and the TUI (#27)
 already exist; their surrounding error handling and documentation are covered here.

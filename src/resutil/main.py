@@ -7,6 +7,7 @@ import os
 import sys
 
 from .console import print
+from .i18n import t
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 
@@ -21,6 +22,60 @@ from .config_file import create_ex_yaml
 from .ex_dir import create_ex_dir, delete_ex_dir
 from .git import GitRepo
 from .core import initialize, upload, get_past_comments, download_with_dependency
+from .network import StorageOfflineError, is_network_error
+
+
+def connect_or_offline(remote_enabled):
+    """Connect to storage; fall back to offline mode when the network is unreachable.
+
+    Authentication and configuration errors still propagate.
+    """
+    if not remote_enabled:
+        return initialize(connect=False) + (False,)
+    try:
+        return initialize(connect=True) + (False,)
+    except StorageOfflineError as exc:
+        print(f"⚠️ {exc}")
+        print(
+            t("📴 Switching to offline mode: results are kept locally without upload.")
+        )
+        return initialize(connect=False) + (True,)
+
+
+def resolve_dependencies(dependencies, results_dir, storage, offline):
+    """Make dependency experiments available locally before any directory is created."""
+    missing = [d for d in dependencies if not d.is_dir()]
+    if not missing:
+        return
+    names = ", ".join(d.name for d in missing)
+    if storage is None:
+        reason = t(
+            "storage is unreachable (offline)"
+            if offline
+            else "remote access is disabled (RESUTIL_NO_REMOTE/RESUTIL_DEBUG)"
+        )
+        raise FileNotFoundError(
+            t(
+                "Cannot run: dependency experiment(s) not found locally and {reason}: "
+                "{names}. Run 'resutil pull <name>' while online, then retry.",
+                reason=reason,
+                names=names,
+            )
+        )
+    for dependency in missing:
+        try:
+            download_with_dependency(dependency.name, results_dir, storage)
+        except Exception as exc:
+            if is_network_error(exc):
+                raise StorageOfflineError(
+                    t(
+                        "Cannot run: failed to download dependency experiment "
+                        "{name} because the network is unavailable: {error}",
+                        name=dependency.name,
+                        error=exc,
+                    )
+                ) from exc
+            raise
 
 
 class resutil_args:
@@ -39,17 +94,21 @@ def get_comment(env_args, config):
     if env_args.comment_env is not None:
         comment = env_args.comment_env
         if not verify_comment(comment):
-            raise ValueError("RESUTIL_COMMENT is invalid (maximum 200 UTF-8 bytes).")
+            raise ValueError(t("RESUTIL_COMMENT is invalid (maximum 200 UTF-8 bytes)."))
         return comment
     if env_args.no_interactive:
         return ""
     comments = WordCompleter(get_past_comments(config.results_dir))
     while True:
-        comment = prompt("📝 Input comment for this experiment: ", completer=comments)
+        comment = prompt(
+            t("📝 Input comment for this experiment: "), completer=comments
+        )
         if verify_comment(comment):
             return comment
         print(
-            "⛔️ Invalid comment (maximum 200 UTF-8 bytes; no path separators or control characters)."
+            t(
+                "⛔️ Invalid comment (maximum 200 UTF-8 bytes; no path separators or control characters)."
+            )
         )
 
 
@@ -67,8 +126,12 @@ def main(verbose=True):
         @wraps(func)
         def wrapper(*args, **kwargs):
             env = get_env_args()
-            remote_enabled = not (env.no_remote or env.debug_mode)
-            config, storage = initialize(connect=remote_enabled)
+            config, storage, offline = connect_or_offline(
+                not (env.no_remote or env.debug_mode)
+            )
+            remote_enabled = storage is not None
+            dependencies = parse_result_dirs(sys.argv, config.results_dir)
+            resolve_dependencies(dependencies, config.results_dir, storage, offline)
             comment = get_comment(env, config)
             now = experiment_now()
             context = (
@@ -83,14 +146,13 @@ def main(verbose=True):
                 else:
                     ex_name = create_ex_dir(now, comment, config.results_dir)
                     ex_dir_path = str(Path(config.results_dir) / ex_name)
-                print(f"📁 Experiment directory: {ex_dir_path}")
+                print(t("📁 Experiment directory: {path}", path=ex_dir_path))
                 git_repo = GitRepo()
                 commit_hash, files = git_repo.get_git_info(
                     exclude_paths=[config.results_dir, ex_dir_path]
                 )
                 if files:
                     git_repo.store_uncomited_to(join(ex_dir_path, "uncommited_files"))
-                dependencies = parse_result_dirs(sys.argv, config.results_dir)
                 create_ex_yaml(
                     ex_dir_path,
                     dependencies,
@@ -100,15 +162,6 @@ def main(verbose=True):
                     comment=comment,
                     started_at=now.isoformat(),
                 )
-                for dependency in dependencies:
-                    if not dependency.is_dir():
-                        if storage is None:
-                            raise FileNotFoundError(
-                                f"Dependency unavailable in offline mode: {dependency}"
-                            )
-                        download_with_dependency(
-                            dependency.name, config.results_dir, storage
-                        )
 
                 def checkpoint_callback():
                     if not remote_enabled:
@@ -117,22 +170,53 @@ def main(verbose=True):
                         upload(ex_name, config.results_dir, storage)
                         return True
                     except Exception as exc:
-                        print(
-                            f"⚠️ Checkpoint upload failed: {exc}. Results remain at {ex_dir_path}."
+                        message = (
+                            "⚠️ Checkpoint upload offline: {error}. Results remain at {path}."
+                            if is_network_error(exc)
+                            else "⚠️ Checkpoint upload failed: {error}. Results remain at {path}."
                         )
+                        print(t(message, error=exc, path=ex_dir_path))
                         return False
 
                 def final_upload():
-                    if remote_enabled and Path(ex_dir_path).exists():
-                        try:
-                            upload(ex_name, config.results_dir, storage)
-                        except Exception:
+                    if not Path(ex_dir_path).exists() or env.debug_mode:
+                        return
+                    if not remote_enabled:
+                        if offline:
                             print(
-                                f"❌ Upload failed. Results remain at {ex_dir_path}. Retry with 'resutil push {ex_name}'."
+                                t(
+                                    "📴 Offline: results were not uploaded. They remain at {path}. "
+                                    "Run 'resutil push {name}' when online.",
+                                    path=ex_dir_path,
+                                    name=ex_name,
+                                )
                             )
-                            raise
+                        return
+                    try:
+                        upload(ex_name, config.results_dir, storage)
+                    except Exception as exc:
+                        if is_network_error(exc):
+                            # Computation succeeded; only synchronization is pending.
+                            print(
+                                t(
+                                    "📴 Offline: upload failed ({error}). Results remain at {path}. "
+                                    "Run 'resutil push {name}' when online.",
+                                    error=exc,
+                                    path=ex_dir_path,
+                                    name=ex_name,
+                                )
+                            )
+                            return
+                        print(
+                            t(
+                                "❌ Upload failed. Results remain at {path}. Retry with 'resutil push {name}'.",
+                                path=ex_dir_path,
+                                name=ex_name,
+                            )
+                        )
+                        raise
 
-                print("🚀 Running the main function...")
+                print(t("🚀 Running the main function..."))
                 try:
                     result = func(
                         resutil_args(ex_dir_path, checkpoint_callback), *args, **kwargs
@@ -146,7 +230,7 @@ def main(verbose=True):
                     ):
                         try:
                             delete = user_confirm(
-                                "Execution failed. Delete local experiment?",
+                                t("Execution failed. Delete local experiment?"),
                                 default="n",
                             )
                         except (EOFError, KeyboardInterrupt):
@@ -163,7 +247,7 @@ def main(verbose=True):
                     raise
                 final_upload()
                 if verbose:
-                    print("✅ Done")
+                    print(t("✅ Done"))
                 return result
 
         return wrapper

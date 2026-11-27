@@ -3,6 +3,7 @@ import time
 from threading import RLock
 from urllib.parse import quote, urlsplit, urlunsplit
 
+from ...i18n import t
 from ...utils import atomic_write, validate_experiment_name
 from base64 import urlsafe_b64decode
 from os.path import basename
@@ -21,7 +22,10 @@ _TOKEN_REFRESH_URL = "https://securetoken.googleapis.com/v1/token"
 def _load_credentials() -> dict:
     if not CREDENTIALS_PATH.exists():
         raise FileNotFoundError(
-            f"Credentials not found at {CREDENTIALS_PATH}. Run 'resutil login' first."
+            t(
+                "Credentials not found at {path}. Run 'resutil login' first.",
+                path=CREDENTIALS_PATH,
+            )
         )
     with CREDENTIALS_PATH.open(encoding="utf-8") as f:
         return json.load(f)
@@ -42,7 +46,7 @@ def normalize_server_url(value):
         or parts.query
         or parts.fragment
     ):
-        raise ValueError("Invalid server URL.")
+        raise ValueError(t("Invalid server URL."))
     host = parts.hostname.lower()
     if ":" in host:
         host = f"[{host}]"
@@ -82,6 +86,11 @@ def _refresh_id_token(refresh_token: str, api_key: str) -> tuple[str, str]:
         },
         timeout=30.0,
     )
+    if resp.status_code in (400, 401, 403):
+        # Revoked or invalid refresh token: an authentication failure, not offline.
+        raise PermissionError(
+            t("Cannot refresh server credentials. Run 'resutil login' again.")
+        )
     resp.raise_for_status()
     data = resp.json()
     return data["id_token"], data["refresh_token"]
@@ -98,11 +107,15 @@ def _ensure_valid_token(creds: dict, force=False) -> dict:
 
     if not refresh_token:
         raise PermissionError(
-            "ID token expired and no refresh token available. Run 'resutil login' again."
+            t(
+                "ID token expired and no refresh token available. Run 'resutil login' again."
+            )
         )
     if not api_key:
         raise PermissionError(
-            "ID token expired but api_key not found in credentials. Run 'resutil login' again."
+            t(
+                "ID token expired but api_key not found in credentials. Run 'resutil login' again."
+            )
         )
 
     new_id_token, new_refresh_token = _refresh_id_token(refresh_token, api_key)
@@ -122,9 +135,12 @@ class ResutilServerStorage(Storage):
         creds = _load_credentials()
         if normalize_server_url(creds.get("server_url", "")) != self.server_url:
             raise PermissionError(
-                "Credentials belong to a different server. Run 'resutil login' for this server."
+                t(
+                    "Credentials belong to a different server. Run 'resutil login' for this server."
+                )
             )
-        creds = _ensure_valid_token(creds)
+        # Token refresh is deferred to the first request so that construction
+        # works offline; _request() refreshes expiring tokens.
         self._creds = creds
         self.id_token = creds["id_token"]
 
@@ -153,12 +169,17 @@ class ResutilServerStorage(Storage):
             resp = self._client.request(method, path, headers=headers, **kwargs)
         if resp.status_code == 401:
             raise PermissionError(
-                "Authentication failed. Your token may have expired. Run 'resutil login' again."
+                t(
+                    "Authentication failed. Your token may have expired. Run 'resutil login' again."
+                )
             )
         if resp.status_code == 403:
             raise PermissionError(
-                f"Access denied. You don't have permission to access bucket '{self.bucket_name}'.\n"
-                "Run 'resutil login' to authenticate."
+                t(
+                    "Access denied. You don't have permission to access bucket '{bucket}'.\n"
+                    "Run 'resutil login' to authenticate.",
+                    bucket=self.bucket_name,
+                )
             )
         resp.raise_for_status()
         return resp

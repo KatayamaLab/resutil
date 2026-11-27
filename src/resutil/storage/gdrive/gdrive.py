@@ -8,6 +8,7 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from ..storage import Storage
 from ...ex_dir import commented_name
+from ...i18n import t
 
 
 def synchronized(method):
@@ -42,7 +43,7 @@ class GDrive(Storage):
         items = self._list(query)
         if len(items) > 1:
             raise ValueError(
-                "Multiple project folders found; resolve duplicate folders first."
+                t("Multiple project folders found; resolve duplicate folders first.")
             )
         if items:
             self.project_dir_id = items[0]["id"]
@@ -147,5 +148,7 @@ class GDrive(Storage):
         if items:
             return items[0]["id"]
         if required:
-            raise FileNotFoundError(f"Remote experiment does not exist: {file_name}")
+            raise FileNotFoundError(
+                t("Remote experiment does not exist: {name}", name=file_name)
+            )
         return None

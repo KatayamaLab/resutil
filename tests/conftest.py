@@ -39,6 +39,12 @@ class MemoryStorage(Storage):
         del self.archives[name]
 
 
+@pytest.fixture(autouse=True)
+def english_messages(monkeypatch):
+    # Assertions match English messages regardless of the developer's OS language.
+    monkeypatch.setenv("RESUTIL_LANG", "en")
+
+
 @pytest.fixture
 def storage():
     return MemoryStorage()

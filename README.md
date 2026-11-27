@@ -364,9 +364,15 @@ The following commands use a POSIX shell. Keep `VERSION` set throughout the proc
   or `--remote`, both copies are deleted.
 - `RESUTIL_NO_REMOTE` disables storage authentication and uploads, including checkpoints.
   The old spelling `RESUTIIL_REMOTE` is accepted as an alias.
+- When storage is unreachable because the network is down, `@resutil.main()` switches
+  to offline mode, keeps results locally and exits normally. A network failure during the
+  final upload is handled the same way. Run `resutil push` later to upload them.
+  Authentication failures still stop execution; run `resutil login`. Dependency
+  experiments that exist only remotely cannot be resolved offline, so execution stops.
 - `RESUTIL_DEBUG` uses a unique temporary directory, cleans it up after execution,
   and skips storage authentication and uploads.
 - `RESUTIL_TIMEZONE=Asia/Tokyo` selects an IANA time zone. Metadata records the UTC offset.
+- `RESUTIL_LANG=ja` or `RESUTIL_LANG=en` selects the message language. By default it follows `LC_ALL`/`LC_MESSAGES`/`LANG`, then the OS language (Japanese or English).
 - `RESUTIL_STORAGE_TYPE`, `RESUTIL_GCS_BUCKET_NAME` and `RESUTIL_GCS_KEY_FILE_PATH`
   override the corresponding storage settings.
 - Configuration paths resolve relative to `resutil-conf.yaml`; the working directory is preserved.

@@ -2,7 +2,7 @@ from pathlib import Path
 import shutil
 from uuid import uuid4
 
-
+from .i18n import t
 from .utils import (
     timestamp_parts,
     validate_experiment_name,
@@ -16,7 +16,7 @@ from .utils import (
 
 def create_ex_dir(now, comment, results_dir):
     if not verify_comment(comment):
-        raise ValueError("Invalid comment (maximum 200 UTF-8 bytes).")
+        raise ValueError(t("Invalid comment (maximum 200 UTF-8 bytes)."))
     prefix, stamp = timestamp_parts(now)
     stem = f"{prefix}_{stamp}"
     name = f"{stem}_{comment}" if comment else stem
@@ -33,7 +33,7 @@ def create_ex_dir(now, comment, results_dir):
 def commented_name(ex_name, comment):
     validate_experiment_name(ex_name)
     if not verify_comment(comment):
-        raise ValueError("Invalid comment (maximum 200 UTF-8 bytes).")
+        raise ValueError(t("Invalid comment (maximum 200 UTF-8 bytes)."))
     return validate_experiment_name(
         "_".join(ex_name.split("_")[:2]) + ("_" + comment if comment else "")
     )
